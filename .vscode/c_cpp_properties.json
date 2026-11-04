@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "name": "STM32F407",
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-arm",
+            "defines": [
+                "DEBUG",
+                "USE_HAL_DRIVER",
+                "STM32F407xx"
+            ],
+            "includePath": [
+                "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Include",
+                "${workspaceFolder}/Users/device",
+                "${workspaceFolder}/Users/bsp",
+                "${workspaceFolder}/Users/alg",
+                "${workspaceFolder}/Users/application"
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/Core",
+                    "${workspaceFolder}/Drivers/CMSIS/Include",
+                    "${workspaceFolder}/Users"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

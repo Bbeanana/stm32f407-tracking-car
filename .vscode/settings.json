@@ -1,0 +1,8 @@
+{
+    "cmake.configureOnOpen": false,
+    "cmake.buildDirectory": "${workspaceFolder}/build_cmake",
+    "C_Cpp.default.configurationProvider": "",
+    "files.associations": {
+        "*.h": "c"
+    }
+}

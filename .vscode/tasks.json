@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "编译固件 (build.sh)",
+            "type": "shell",
+            "command": "bash",
+            "args": ["${workspaceFolder}/build.sh"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "烧录 (ST-Link + OpenOCD)",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f", "interface/stlink.cfg",
+                "-f", "target/stm32f4x.cfg",
+                "-c", "program ${workspaceFolder}/build/tracking_car.elf verify reset exit"
+            ],
+            "dependsOn": "编译固件 (build.sh)",
+            "problemMatcher": []
+        },
+        {
+            "label": "烧录 (无NRST复位线时用这个)",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f", "interface/stlink.cfg",
+                "-f", "target/stm32f4x.cfg",
+                "-c", "reset_config none",
+                "-c", "program ${workspaceFolder}/build/tracking_car.elf verify reset exit"
+            ],
+            "dependsOn": "编译固件 (build.sh)",
+            "problemMatcher": []
+        }
+    ]
+}
