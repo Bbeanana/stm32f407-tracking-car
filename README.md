@@ -257,12 +257,12 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
-| `CAR_LINE_BASE_SPEED_MPS` | 0.18 | 直线基础速度（整体 1.5 倍） |
-| `CAR_LINE_MIN_SPEED_MPS` | 0.06 | 大偏差时最低基础速度 |
-| `CAR_LINE_MAX_SPEED_MPS` | 0.45 | 单轮最大速度 |
+| `CAR_LINE_BASE_SPEED_MPS` | 0.20 | 直线基础速度（再次提速） |
+| `CAR_LINE_MIN_SPEED_MPS` | 0.07 | 大偏差时最低基础速度 |
+| `CAR_LINE_MAX_SPEED_MPS` | 0.50 | 单轮最大速度 |
 | `CAR_LINE_KP` | 0.24 | 偏差比例系数，越大修正越猛 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.25 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.28 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
@@ -271,7 +271,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_CAMERA_TIMEOUT_MS` | 200 | 摄像头超过该时间没有有效帧就停车 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
-| `CAR_SEARCH_SPEED_MPS` | 0.15 | 原地找线速度 |
+| `CAR_SEARCH_SPEED_MPS` | 0.17 | 原地找线速度 |
 | `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转特化（模式 1）时的单向找线时间 |
 | `CAR_SEARCH_TIMEOUT_MS` | 3400 | 左右弯都有的双向找线总时间 |
 | `CAR_SEARCH_PHASE_MS` | 1200 | 双向模式第一段找线时间，超时后反向 |
@@ -343,6 +343,8 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
   `CAR_CAM_ARC_EXIT_MS` → 退出圆弧，响一声
 - `|CURV|` 大于 `CAR_CAM_ARC_MAX_DEG` → 按直角弯处理，复位并静默
   `CAR_ARC_SUPPRESS_MS`，不产生圆弧提示
+- 每一圈只允许一段圆弧提示：入弯一声、出弯一声；圆弧中间 `CURV` 抖动
+  或出弯后到起点的直角弯不再重复响
 - 每次状态切换后会静默 `CAR_ARC_SUPPRESS_MS`，避免起步和找线时误响
 
 | 参数 | 默认 | 说明 |
@@ -422,7 +424,7 @@ OB 3         障碍物次数
 | `CAR_SPEED_PID_KI` | 0.25 | 速度环 Ki（降低以抑制积分饱和） |
 | `CAR_SPEED_PID_MAX_INTEGRAL` | 0.40 | 积分限幅 |
 | `CAR_SPEED_FF_GAIN` | 0.80 | 速度前馈，补偿低速死区/起步占空比 |
-| `CAR_SPEED_RAMP_MPS2` | 1.50 | 加减速斜坡，防止起步猛冲 |
+| `CAR_SPEED_RAMP_MPS2` | 1.70 | 加减速斜坡，防止起步猛冲 |
 | `CAR_MAX_WHEEL_SPEED_MPS` | 0.55 | 单轮最大速度 |
 | `CAR_ENCODER_CPR` | 1560 | 输出轴一圈计数（必须标定） |
 | `CAR_WHEEL_RADIUS_M` | 0.0325 | 车轮半径（65mm 轮径） |
@@ -464,7 +466,7 @@ INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15c
   如果确定赛道只有右转，可把 `CAR_RIGHT_TURNS_ONLY` 改成 `1`，找线会固定
   向右并使用 `CAR_SEARCH_RIGHT_TIMEOUT_MS` 单向超时。
 - 底盘为**两个后轮差速驱动 + 前万向轮**：原地找线时绕后轴旋转，车头的
-  八路传感器会扫过直角弯后的线。找线速度取 0.15m/s，避免车头扫得太快漏线。
+  八路传感器会扫过直角弯后的线。找线速度取 0.17m/s，避免车头扫得太快漏线。
 - 上电后从未检测到线时，`CAR_START_REQUIRE_LINE=1` 会先停车，不进入
   `SEARCH`，避免传感器没接线或车没放正时一上电就原地右转。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。

@@ -49,6 +49,8 @@ static uint32_t s_search_phase_tick;
 
 /* 圆弧弯道提示状态（摄像头 CURV） */
 static uint8_t s_arc_active;
+static uint8_t s_arc_stage;   /* 0=本圈未入弯, 1=已入弯, 2=已出弯 */
+static uint8_t s_arc_lap;
 static uint32_t s_arc_candidate_tick;
 static uint32_t s_arc_exit_tick;
 static uint8_t s_arc_suppressed;
@@ -89,6 +91,23 @@ static void Car_ArcUpdate(uint32_t now)
         return;
     }
 
+    /* 每一圈只允许一段圆弧提示：入弯一声、出弯一声。
+     * 圆弧中间 CURV 抖动或出弯后的直角弯不再重复响。 */
+    {
+        uint8_t lap = LapTimer_GetCurrentLap();
+        if (lap != s_arc_lap) {
+            s_arc_lap = lap;
+            s_arc_stage = 0U;
+            s_arc_active = 0U;
+            s_arc_candidate_tick = 0U;
+            s_arc_exit_tick = 0U;
+        }
+    }
+
+    if (s_arc_stage >= 2U) {
+        return;
+    }
+
     abs_curv = fabsf(Camera_GetCurvatureDeg());
 
     /* 直角弯/异常大曲率：复位圆弧状态，避免把直角弯当圆弧 */
@@ -104,7 +123,7 @@ static void Car_ArcUpdate(uint32_t now)
         s_arc_suppressed = 0U;
     }
 
-    if (!s_arc_active) {
+    if (s_arc_stage == 0U) {
         if (abs_curv >= CAR_CAM_ARC_ENTER_DEG) {
             if (s_arc_candidate_tick == 0U) {
                 s_arc_candidate_tick = now;
@@ -113,12 +132,13 @@ static void Car_ArcUpdate(uint32_t now)
                 s_arc_candidate_tick = 0U;
                 s_arc_active = 1U;
                 s_arc_exit_tick = 0U;
+                s_arc_stage = 1U;
                 Buzzer_Beep(CAR_ARC_BEEP_MS);
             }
         } else {
             s_arc_candidate_tick = 0U;
         }
-    } else {
+    } else if (s_arc_stage == 1U) {
         if (abs_curv <= CAR_CAM_ARC_EXIT_DEG) {
             if (s_arc_exit_tick == 0U) {
                 s_arc_exit_tick = now;
@@ -126,6 +146,7 @@ static void Car_ArcUpdate(uint32_t now)
                        CAR_CAM_ARC_EXIT_MS) {
                 s_arc_active = 0U;
                 s_arc_exit_tick = 0U;
+                s_arc_stage = 2U;
                 Buzzer_Beep(CAR_ARC_BEEP_MS);
             }
         } else {
