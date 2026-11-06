@@ -117,7 +117,7 @@
 /* 单轮最大线速度与加减速斜坡 */
 #define CAR_MAX_WHEEL_SPEED_MPS          0.55f
 #define CAR_SPEED_RAMP_MPS2              1.00f   /* 先放缓加速，减小起步超调 */
-#define CAR_SPEED_DEADBAND_MPS           0.010f
+#define CAR_SPEED_DEADBAND_MPS           0.004f
 #define CAR_SPEED_STOP_EPS_MPS           0.020f
 #define CAR_WHEEL_TRIM_L                 1.000f
 #define CAR_WHEEL_TRIM_R                 1.000f
