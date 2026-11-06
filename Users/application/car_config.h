@@ -36,11 +36,17 @@
 #define CAR_LINE_ERROR_FILTER            0.35f   /* 0~1，越小越平滑 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
-/* 丢线/直角弯找线：短暂保持上一次偏差，超过时间则原地双向找线 */
+/* 1=赛道路线只有右转弯（圆弧和直角），找线固定向右、圆弧提示只认右偏；
+ * 0=左右弯都可能，使用双向找线。 */
+#define CAR_RIGHT_TURNS_ONLY             1
+
+/* 丢线/直角弯找线：短暂保持上一次偏差，超过时间则原地找线。
+ * 底盘是后轮差速 + 前万向轮，原地转向时绕后轴旋转，车头传感器扫过弯后的线。 */
 #define CAR_LOST_STOP_MS                 120U
-#define CAR_SEARCH_SPEED_MPS             0.12f
-#define CAR_SEARCH_TIMEOUT_MS            3400U   /* 两段找线的总时间 */
-#define CAR_SEARCH_PHASE_MS              1200U   /* 第一段找线时间，超时后反向 */
+#define CAR_SEARCH_SPEED_MPS             0.10f
+#define CAR_SEARCH_TIMEOUT_MS            3400U   /* 左右弯都有的双向找线时间 */
+#define CAR_SEARCH_RIGHT_TIMEOUT_MS      2200U   /* 只有右转时单向找线时间 */
+#define CAR_SEARCH_PHASE_MS              1200U   /* 双向模式第一段找线时间 */
 #define CAR_SEARCH_HINT_MS               800U    /* 最后一次有效偏差的方向有效期 */
 #define CAR_SEARCH_HINT_MIN_ERROR        0.10f   /* 记录转向提示的最小 |E| */
 #define CAR_SEARCH_DEFAULT_DIR           (+1)    /* 没有方向提示时先向右转 */

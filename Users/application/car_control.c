@@ -26,12 +26,16 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 
-/* 直角弯找线提示：记录丢线前最后一次有效偏差的方向 */
+#if !CAR_RIGHT_TURNS_ONLY
+/* 左右弯都可能时，记录丢线前最后一次有效偏差的方向 */
 static float s_last_turn_hint;
 static uint32_t s_last_turn_hint_tick;
+#endif
 static int8_t s_search_dir;
+#if !CAR_RIGHT_TURNS_ONLY
 static uint8_t s_search_phase;
 static uint32_t s_search_phase_tick;
+#endif
 
 /* 圆弧弯道提示状态 */
 static uint8_t s_arc_active;
@@ -91,6 +95,13 @@ static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
     float error_delta = fabsf(error - s_arc_error_slow);
     uint8_t sharp = 0U;
 
+#if CAR_RIGHT_TURNS_ONLY
+    /* 只有右转弯：只把正偏差（线在右侧）当作圆弧候选 */
+    float curve_error = error;
+#else
+    float curve_error = abs_error;
+#endif
+
     s_arc_error_slow += 0.05f * (error - s_arc_error_slow);
 
     if (lost || all_active || count > CAR_ARC_MAX_SENSORS ||
@@ -112,7 +123,7 @@ static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
     }
 
     if (!s_arc_active) {
-        if (abs_error >= CAR_ARC_ENTER_ABS_ERROR &&
+        if (curve_error >= CAR_ARC_ENTER_ABS_ERROR &&
             abs_error <= CAR_ARC_MAX_ABS_ERROR) {
             int8_t sign = (error >= 0.0f) ? 1 : -1;
 
@@ -131,7 +142,7 @@ static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
             s_arc_candidate = 0U;
         }
     } else {
-        if (abs_error <= CAR_ARC_EXIT_ABS_ERROR) {
+        if (curve_error <= CAR_ARC_EXIT_ABS_ERROR) {
             if (s_arc_exit_tick == 0U) {
                 s_arc_exit_tick = now;
             } else if ((uint32_t)(now - s_arc_exit_tick) >=
@@ -173,6 +184,10 @@ static void Car_EnterState(CarState_t state)
     Car_ArcReset(1U, s_state_tick);
 
     if (state == CAR_STATE_SEARCH) {
+#if CAR_RIGHT_TURNS_ONLY
+        /* 赛道只有右转弯，丢线后固定向右找线 */
+        s_search_dir = 1;
+#else
         /* 优先朝丢线前最后看到线的方向转；没有有效提示时用默认方向 */
         s_search_phase = 0U;
         s_search_phase_tick = s_state_tick;
@@ -183,6 +198,7 @@ static void Car_EnterState(CarState_t state)
             fabsf(s_last_turn_hint) >= CAR_SEARCH_HINT_MIN_ERROR) {
             s_search_dir = (s_last_turn_hint >= 0.0f) ? 1 : -1;
         }
+#endif
     }
 
     if (state == CAR_STATE_LINE) {
@@ -232,11 +248,15 @@ void Car_Init(void)
     s_last_error = 0.0f;
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
+#if !CAR_RIGHT_TURNS_ONLY
     s_last_turn_hint = 0.0f;
     s_last_turn_hint_tick = 0U;
-    s_search_dir = (CAR_SEARCH_DEFAULT_DIR >= 0) ? 1 : -1;
+#endif
+    s_search_dir = 1;
+#if !CAR_RIGHT_TURNS_ONLY
     s_search_phase = 0U;
     s_search_phase_tick = s_state_tick;
+#endif
     Car_ArcReset(1U, s_state_tick);
 }
 
@@ -292,12 +312,14 @@ static void Car_LineLoop(void)
         error = 0.0f;   /* 十字/宽黑线：直行通过 */
     }
 
+#if !CAR_RIGHT_TURNS_ONLY
     /* 记住丢线前最后一段有效的偏线方向，供直角弯原地找线使用 */
     if (!track_lost && !all_active &&
         fabsf(error) >= CAR_SEARCH_HINT_MIN_ERROR) {
         s_last_turn_hint = error;
         s_last_turn_hint_tick = now;
     }
+#endif
 
     Car_ArcUpdate(now, error, track_lost, all_active);
 
@@ -344,12 +366,19 @@ static void Car_SearchLoop(void)
         s_line_seen_count = 0U;
     }
 
-    if ((uint32_t)(now - s_state_tick) > CAR_SEARCH_TIMEOUT_MS) {
+#if CAR_RIGHT_TURNS_ONLY
+    uint32_t search_timeout = CAR_SEARCH_RIGHT_TIMEOUT_MS;
+#else
+    uint32_t search_timeout = CAR_SEARCH_TIMEOUT_MS;
+#endif
+
+    if ((uint32_t)(now - s_state_tick) > search_timeout) {
         Motion_Brake();
         Car_EnterState(CAR_STATE_STOP);
         return;
     }
 
+#if !CAR_RIGHT_TURNS_ONLY
     /* 第一段没找到线就立即反向，避免方向提示错误时一直转下去 */
     if (s_search_phase == 0U &&
         (uint32_t)(now - s_search_phase_tick) >= CAR_SEARCH_PHASE_MS) {
@@ -357,6 +386,7 @@ static void Car_SearchLoop(void)
         s_search_phase = 1U;
         s_search_phase_tick = now;
     }
+#endif
 
     float search = CAR_SEARCH_SPEED_MPS;
     if (s_search_dir > 0) {
