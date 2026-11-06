@@ -29,6 +29,21 @@ uint8_t LapTimer_IsFinished(void);
 uint32_t LapTimer_GetLapMs(uint8_t index);
 
 /**
+ * @brief 当前圈已计时时间，单位 ms；未发车或已跑完返回 0
+ */
+uint32_t LapTimer_GetCurrentMs(void);
+
+/**
+ * @brief 当前圈号（1 开始）；未发车返回 0，跑完返回 CAR_LAP_COUNT
+ */
+uint8_t LapTimer_GetCurrentLap(void);
+
+/**
+ * @brief 是否正在计时
+ */
+uint8_t LapTimer_IsRunning(void);
+
+/**
  * @brief 第 index 圈是否已经完成
  */
 uint8_t LapTimer_HasLap(uint8_t index);

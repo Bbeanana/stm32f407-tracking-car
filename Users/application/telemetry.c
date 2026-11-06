@@ -5,6 +5,7 @@
 #include "main.h"
 #include "car_config.h"
 #include "car_control.h"
+#include "lap_timer.h"
 #include "motion.h"
 #include "current_sense.h"
 
@@ -56,8 +57,32 @@ static void Telemetry_PrintCalibration(void)
  * @brief 周期打印 CSV 遥测（默认 200ms；校准模式 100ms）
  *
  * 输出示例：
- *   S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0
+ *   S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1=12.34 L2=--.-- LAP=3.45 N=2
  */
+static void Telemetry_FormatLap(char *out, uint8_t out_size, uint8_t index)
+{
+    if (LapTimer_HasLap(index)) {
+        uint32_t ms = LapTimer_GetLapMs(index);
+        snprintf(out, out_size, "%lu.%02lu",
+                 (unsigned long)(ms / 1000U),
+                 (unsigned long)((ms % 1000U) / 10U));
+    } else {
+        snprintf(out, out_size, "--.--");
+    }
+}
+
+static void Telemetry_FormatCurrentLap(char *out, uint8_t out_size)
+{
+    if (LapTimer_IsRunning()) {
+        uint32_t ms = LapTimer_GetCurrentMs();
+        snprintf(out, out_size, "%lu.%02lu",
+                 (unsigned long)(ms / 1000U),
+                 (unsigned long)((ms % 1000U) / 10U));
+    } else {
+        snprintf(out, out_size, "--.--");
+    }
+}
+
 void Telemetry_Update(void)
 {
 #if CAR_TELEMETRY_ENABLE
@@ -77,7 +102,15 @@ void Telemetry_Update(void)
 #if CAR_BRINGUP_MODE == 3
     Telemetry_PrintCalibration();
 #else
-    printf("S=%s D=%.1f U=%u M=%02X E=%+.2f T=%.2f/%.2f V=%.2f/%.2f C=%ld/%ld A=%.2f F=%u\r\n",
+    char lap1[12];
+    char lap2[12];
+    char current_lap[12];
+
+    Telemetry_FormatLap(lap1, sizeof(lap1), 0U);
+    Telemetry_FormatLap(lap2, sizeof(lap2), 1U);
+    Telemetry_FormatCurrentLap(current_lap, sizeof(current_lap));
+
+    printf("S=%s D=%.1f U=%u M=%02X E=%+.2f T=%.2f/%.2f V=%.2f/%.2f C=%ld/%ld A=%.2f F=%u L1=%s L2=%s LAP=%s N=%u\r\n",
            Car_GetStateName(),
            (double)Car_GetDistanceCm(),
            Car_GetUltrasonicValid(),
@@ -90,7 +123,11 @@ void Telemetry_Update(void)
            (long)Motion_GetCountL(),
            (long)Motion_GetCountR(),
            (double)CurrentSense_ReadVolts(),
-           Motion_GetFaultCode());
+           Motion_GetFaultCode(),
+           lap1,
+           lap2,
+           current_lap,
+           (unsigned)LapTimer_GetCurrentLap());
 #endif
 #endif
 }

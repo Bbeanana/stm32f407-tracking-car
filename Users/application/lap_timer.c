@@ -112,6 +112,30 @@ uint32_t LapTimer_GetLapMs(uint8_t index)
     return s_lap_ms[index];
 }
 
+uint32_t LapTimer_GetCurrentMs(void)
+{
+    if (!s_started || !s_running) {
+        return 0U;
+    }
+    return (uint32_t)(HAL_GetTick() - s_lap_start_ms);
+}
+
+uint8_t LapTimer_GetCurrentLap(void)
+{
+    if (!s_started) {
+        return 0U;
+    }
+    if (s_lap_index >= CAR_LAP_COUNT) {
+        return CAR_LAP_COUNT;
+    }
+    return (uint8_t)(s_lap_index + 1U);
+}
+
+uint8_t LapTimer_IsRunning(void)
+{
+    return s_running;
+}
+
 uint8_t LapTimer_HasLap(uint8_t index)
 {
     if (index >= CAR_LAP_COUNT) {

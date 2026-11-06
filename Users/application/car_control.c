@@ -388,8 +388,11 @@ static void Car_LineLoop(void)
     s_line_ever_seen = 1U;
     float error = Camera_GetError();
 
-    /* 仅保留圆弧蜂鸣提示；前八路不参与转向 */
-    Car_ArcUpdate(now, error, 0U, 0U);
+    /* 转向只用摄像头；前八路只保留圆弧进出蜂鸣判断，不参与转向 */
+    Car_ArcUpdate(now,
+                  TrackSensor_GetError(&s_track),
+                  TrackSensor_IsLost(&s_track),
+                  TrackSensor_IsAllActive(&s_track));
 
     /* 摄像头 CURV 直角弯计数；第二圈完成立即停车 */
     Car_CameraCornerUpdate(now);
