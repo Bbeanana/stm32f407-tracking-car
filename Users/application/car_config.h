@@ -27,6 +27,9 @@
 /* 1=通道顺序与车头左右相反（例如模块装反了） */
 #define TRACK_REVERSE_ORDER              0
 
+/* 摄像头帧超时：超过该时间没有收到有效包就停车 */
+#define CAR_CAMERA_TIMEOUT_MS             200U
+
 #define CAR_LINE_BASE_SPEED_MPS          0.12f
 #define CAR_LINE_MIN_SPEED_MPS           0.04f
 #define CAR_LINE_MAX_SPEED_MPS           0.30f

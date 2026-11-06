@@ -5,6 +5,7 @@
 
 #include "board_config.h"
 #include "buzzer.h"
+#include "camera.h"
 #include "car_config.h"
 #include "tim.h"
 #include "motion.h"
@@ -245,6 +246,7 @@ void Car_Init(void)
 #endif
     TrackSensor_Init(&s_track, &track_cfg);
     Ultrasonic_Init(&s_ultra, &ultra_cfg);
+    Camera_Init();
 
     s_state = CAR_STATE_INIT;
     s_state_tick = HAL_GetTick();
@@ -287,8 +289,6 @@ static uint8_t Car_ObstacleDetected(void)
  */
 static void Car_LineLoop(void)
 {
-    uint32_t now = HAL_GetTick();
-
     if (Car_ObstacleDetected()) {
         /* 检测到障碍物只停车，不再执行后退/转向绕行 */
         Motion_Brake();
@@ -297,49 +297,14 @@ static void Car_LineLoop(void)
         return;
     }
 
-    uint8_t track_lost = TrackSensor_IsLost(&s_track);
-
-    if (track_lost) {
-        if ((uint32_t)(now - TrackSensor_GetLastSeenTick(&s_track)) >
-            CAR_LOST_STOP_MS) {
-            Motion_Brake();
-
-#if CAR_START_REQUIRE_LINE
-            /* 上电后从未见过线：先停车检查摆放/接线，不要直接右转搜索 */
-            if (!s_line_ever_seen) {
-                Car_EnterState(CAR_STATE_STOP);
-                return;
-            }
-#endif
-
-            Car_EnterState(CAR_STATE_SEARCH);
-            return;
-        }
-        /* 短暂丢线：继续使用上一次偏差通过小缝隙 */
-    } else {
-        s_line_ever_seen = 1U;
-
-        if (s_line_seen_count < 250U) {
-            s_line_seen_count++;
-        }
+    /* 循迹只使用摄像头 ERR；前八路传感器不参与转向 */
+    if (!Camera_IsValid()) {
+        Motion_Brake();
+        return;
     }
 
-    uint8_t all_active = TrackSensor_IsAllActive(&s_track);
-    float error = TrackSensor_GetError(&s_track);
-    if (all_active) {
-        error = 0.0f;   /* 十字/宽黑线：直行通过 */
-    }
-
-#if !CAR_RIGHT_TURNS_ONLY
-    /* 记住丢线前最后一段有效的偏线方向，供直角弯原地找线使用 */
-    if (!track_lost && !all_active &&
-        fabsf(error) >= CAR_SEARCH_HINT_MIN_ERROR) {
-        s_last_turn_hint = error;
-        s_last_turn_hint_tick = now;
-    }
-#endif
-
-    Car_ArcUpdate(now, error, track_lost, all_active);
+    s_line_ever_seen = 1U;
+    float error = Camera_GetError();
 
     s_error_filtered +=
         CAR_LINE_ERROR_FILTER * (error - s_error_filtered);
@@ -449,15 +414,9 @@ static void Car_StopLoop(void)
     }
 
 #if CAR_AUTO_RESUME
-    if (!TrackSensor_IsLost(&s_track)) {
-        if (s_line_seen_count < 250U) {
-            s_line_seen_count++;
-        }
-        if (s_line_seen_count >= 3U) {
-            Car_EnterState(CAR_STATE_LINE);
-        }
-    } else {
-        s_line_seen_count = 0U;
+    /* 摄像头有效就恢复循迹；前八路传感器不参与转向 */
+    if (Camera_IsValid()) {
+        Car_EnterState(CAR_STATE_LINE);
     }
 #endif
 }
@@ -497,8 +456,9 @@ static void Car_BringupMotorLoop(void)
  */
 void Car_Loop(float dt_s)
 {
-    TrackSensor_Update(&s_track);
+    TrackSensor_Update(&s_track);   /* 只保留给遥测/调试，不参与转向 */
     Ultrasonic_Update(&s_ultra);
+    Camera_Update();
 
     uint32_t now = HAL_GetTick();
 

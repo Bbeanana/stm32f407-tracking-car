@@ -2,6 +2,7 @@
 #include "stm32f4xx_it.h"
 
 #include "tim.h"
+#include "camera.h"
 
 /******************************************************************************/
 /* Cortex-M4 Processor Interruption and Exception Handlers                    */
@@ -64,4 +65,12 @@ void SysTick_Handler(void)
 void TIM5_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&htim5);
+}
+
+/**
+  * @brief 摄像头 UART 接收中断
+  */
+void USART1_IRQHandler(void)
+{
+    Camera_UartIrqHandler();
 }

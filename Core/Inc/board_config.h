@@ -53,6 +53,16 @@
  * 5ms 周期下 0.15 约等于 30ms 时间常数。 */
 #define TRACK_LPF_ALPHA          0.15f
 
+/* ------------------------- 摄像头 UART（独立） -------------------------- */
+/* USART1：PA10=RX，PA9=TX，115200 8N1。
+ * 摄像头 TX 接 PA10，摄像头 RX 接 PA9（如果只单向发送，PA9 可不接）。 */
+#define CAMERA_UART_INSTANCE     USART1
+#define CAMERA_UART_BAUD         115200U
+#define CAMERA_UART_TX_PORT      GPIOA
+#define CAMERA_UART_TX_PIN       GPIO_PIN_9
+#define CAMERA_UART_RX_PORT      GPIOA
+#define CAMERA_UART_RX_PIN       GPIO_PIN_10
+
 /* ------------------------------- 超声波 -------------------------------- */
 #define ULTRA_TRIG_PORT          GPIOA
 #define ULTRA_TRIG_PIN           GPIO_PIN_1
