@@ -10,15 +10,6 @@
 #include "track_sensor.h"
 #include "ultrasonic.h"
 
-typedef enum {
-    AVOID_STEP_BRAKE = 0,
-    AVOID_STEP_BACK,
-    AVOID_STEP_TURN_OUT,
-    AVOID_STEP_DRIVE,
-    AVOID_STEP_TURN_BACK,
-    AVOID_STEP_REACQUIRE,
-} AvoidStep_t;
-
 static TrackSensor_t s_track;
 static Ultrasonic_t s_ultra;
 
@@ -26,11 +17,9 @@ static CarState_t s_state;
 static uint32_t s_state_tick;
 static uint32_t s_bringup_tick;
 
-static AvoidStep_t s_avoid_step;
-static uint32_t s_avoid_tick;
-static int8_t s_avoid_dir;
-static uint8_t s_avoid_attempts;
-static uint8_t s_avoid_locked;
+/* 因障碍物进入 STOP 时置 1；障碍物移开并稳定后清零 */
+static uint8_t s_stop_by_obstacle;
+static uint32_t s_obstacle_clear_tick;
 
 static float s_last_error;
 static float s_error_filtered;
@@ -58,13 +47,9 @@ static void Car_EnterState(CarState_t state)
         s_last_error = s_error_filtered;
     }
 
-    if (state == CAR_STATE_AVOID) {
-        s_avoid_step = AVOID_STEP_BRAKE;
-        s_avoid_tick = s_state_tick;
-        s_avoid_dir = (CAR_AVOID_DIR >= 0) ? 1 : -1;
-        if (s_avoid_attempts < 255U) {
-            s_avoid_attempts++;
-        }
+    if (state == CAR_STATE_STOP) {
+        s_stop_by_obstacle = 0U;
+        s_obstacle_clear_tick = s_state_tick;
     }
 }
 
@@ -99,11 +84,8 @@ void Car_Init(void)
     s_state = CAR_STATE_INIT;
     s_state_tick = HAL_GetTick();
     s_bringup_tick = s_state_tick;
-    s_avoid_step = AVOID_STEP_BRAKE;
-    s_avoid_tick = s_state_tick;
-    s_avoid_dir = (CAR_AVOID_DIR >= 0) ? 1 : -1;
-    s_avoid_attempts = 0U;
-    s_avoid_locked = 0U;
+    s_stop_by_obstacle = 0U;
+    s_obstacle_clear_tick = s_state_tick;
     s_last_error = 0.0f;
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
@@ -132,15 +114,10 @@ static void Car_LineLoop(void)
     uint32_t now = HAL_GetTick();
 
     if (Car_ObstacleDetected()) {
+        /* 检测到障碍物只停车，不再执行后退/转向绕行 */
         Motion_Brake();
-
-        if (s_avoid_locked || s_avoid_attempts >= CAR_AVOID_MAX_ATTEMPTS) {
-            s_avoid_locked = 1U;
-            Car_EnterState(CAR_STATE_STOP);
-            return;
-        }
-
-        Car_EnterState(CAR_STATE_AVOID);
+        Car_EnterState(CAR_STATE_STOP);
+        s_stop_by_obstacle = 1U;
         return;
     }
 
@@ -188,127 +165,6 @@ static void Car_LineLoop(void)
 }
 
 /**
- * @brief 超声波绕障状态
- *
- * 流程：
- *   刹车 → 后退一点 → 向一侧原地转出 → 直行绕过障碍
- *   → 反向转回 → 低速直行直到重新看到线 → 回到 LINE
- *
- * 只有一个前向超声波，无法判断左右哪边更空，因此默认固定右绕，
- * 可用 CAR_AVOID_DIR 改成 -1 左绕。路线只有直线/圆弧时足够用。
- */
-static void Car_AvoidLoop(void)
-{
-    uint32_t now = HAL_GetTick();
-    uint32_t elapsed = (uint32_t)(now - s_avoid_tick);
-    float turn_speed = CAR_AVOID_TURN_SPEED_MPS;
-
-    switch (s_avoid_step) {
-        case AVOID_STEP_BRAKE:
-            Motion_Brake();
-            if (elapsed >= CAR_AVOID_BRAKE_MS) {
-                s_avoid_step = AVOID_STEP_BACK;
-                s_avoid_tick = now;
-            }
-            break;
-
-        case AVOID_STEP_BACK:
-            Motion_SetWheelSpeeds(-CAR_AVOID_BACK_SPEED_MPS,
-                                  -CAR_AVOID_BACK_SPEED_MPS);
-
-            /* 至少退 BACK_MS；如果障碍物仍然太近，继续退到有转向空间，
-             * 最多退 BACK_MAX_MS。这样障碍物贴近车头时也能先拉开距离。 */
-            if (elapsed >= CAR_AVOID_BACK_MS &&
-                (Ultrasonic_GetDistanceCm(&s_ultra) > CAR_AVOID_BACK_CLEAR_CM ||
-                 elapsed >= CAR_AVOID_BACK_MAX_MS)) {
-                s_avoid_step = AVOID_STEP_TURN_OUT;
-                s_avoid_tick = now;
-            }
-            break;
-
-        case AVOID_STEP_TURN_OUT:
-            if (s_avoid_dir > 0) {
-                Motion_SetWheelSpeeds(turn_speed, -turn_speed);
-            } else {
-                Motion_SetWheelSpeeds(-turn_speed, turn_speed);
-            }
-            if (elapsed >= CAR_AVOID_TURN_MS) {
-                s_avoid_step = AVOID_STEP_DRIVE;
-                s_avoid_tick = now;
-            }
-            break;
-
-        case AVOID_STEP_DRIVE:
-            Motion_SetWheelSpeeds(CAR_AVOID_DRIVE_SPEED_MPS,
-                                  CAR_AVOID_DRIVE_SPEED_MPS);
-
-            if (elapsed >= CAR_AVOID_DRIVE_MAX_MS) {
-                /* 绕了很久还没过去：停车保护，避免继续顶障碍物 */
-                Motion_Brake();
-                Car_EnterState(CAR_STATE_STOP);
-                return;
-            }
-
-            if (elapsed >= CAR_AVOID_DRIVE_MS &&
-                Ultrasonic_GetDistanceCm(&s_ultra) > CAR_AVOID_CLEAR_CM) {
-                s_avoid_step = AVOID_STEP_TURN_BACK;
-                s_avoid_tick = now;
-            }
-            break;
-
-        case AVOID_STEP_TURN_BACK:
-            if (s_avoid_dir > 0) {
-                Motion_SetWheelSpeeds(-turn_speed, turn_speed);
-            } else {
-                Motion_SetWheelSpeeds(turn_speed, -turn_speed);
-            }
-            if (elapsed >= CAR_AVOID_TURN_BACK_MS) {
-                s_avoid_step = AVOID_STEP_REACQUIRE;
-                s_avoid_tick = now;
-                s_line_seen_count = 0U;
-            }
-            break;
-
-        case AVOID_STEP_REACQUIRE: {
-            /* 右绕后线在左侧，左轮慢一点、右轮快一点，让车往线的方向回拐；
-             * 左绕时相反。这样不是一直直行，更容易重新扫到线。 */
-            float speed = CAR_AVOID_REACQUIRE_SPEED_MPS;
-            float turn = CAR_AVOID_REACQUIRE_TURN_MPS;
-            if (s_avoid_dir > 0) {
-                Motion_SetWheelSpeeds(speed - turn, speed + turn);
-            } else {
-                Motion_SetWheelSpeeds(speed + turn, speed - turn);
-            }
-
-            if (!TrackSensor_IsLost(&s_track)) {
-                if (s_line_seen_count < 250U) {
-                    s_line_seen_count++;
-                }
-                if (s_line_seen_count >= 3U) {
-                    s_avoid_attempts = 0U;
-                    s_avoid_locked = 0U;
-                    Car_EnterState(CAR_STATE_LINE);
-                    return;
-                }
-            } else {
-                s_line_seen_count = 0U;
-            }
-
-            if (elapsed >= CAR_AVOID_REACQUIRE_TIMEOUT_MS) {
-                Motion_Brake();
-                Car_EnterState(CAR_STATE_SEARCH);
-            }
-            break;
-        }
-
-        default:
-            Motion_Brake();
-            Car_EnterState(CAR_STATE_STOP);
-            break;
-    }
-}
-
-/**
  * @brief 丢线搜索：按最后偏差方向原地慢转
  */
 static void Car_SearchLoop(void)
@@ -343,14 +199,35 @@ static void Car_SearchLoop(void)
 }
 
 /**
- * @brief 停车状态：线重新出现时可自动恢复（可配置）
+ * @brief 停车状态：障碍物移开且线重新出现后可自动恢复（可配置）
  */
 static void Car_StopLoop(void)
 {
     Motion_Brake();
 
+    if (s_stop_by_obstacle) {
+#if CAR_OBSTACLE_STOP_LATCH
+        /* 锁存停车：必须复位/断电，适合“遇到障碍物即结束”的场景 */
+        return;
+#else
+        uint32_t now = HAL_GetTick();
+
+        /* 回差：降到 CAR_OBSTACLE_CLEAR_CM 以下仍保持停车，
+         * 超过该距离并稳定 CAR_OBSTACLE_CLEAR_HOLD_MS 才允许恢复。 */
+        if (Ultrasonic_GetDistanceCm(&s_ultra) < CAR_OBSTACLE_CLEAR_CM) {
+            s_obstacle_clear_tick = now;
+            return;
+        }
+        if ((uint32_t)(now - s_obstacle_clear_tick) <
+            CAR_OBSTACLE_CLEAR_HOLD_MS) {
+            return;
+        }
+        s_stop_by_obstacle = 0U;
+#endif
+    }
+
 #if CAR_AUTO_RESUME
-    if (!s_avoid_locked && !TrackSensor_IsLost(&s_track)) {
+    if (!TrackSensor_IsLost(&s_track)) {
         if (s_line_seen_count < 250U) {
             s_line_seen_count++;
         }
@@ -432,10 +309,6 @@ void Car_Loop(float dt_s)
             Car_LineLoop();
             break;
 
-        case CAR_STATE_AVOID:
-            Car_AvoidLoop();
-            break;
-
         case CAR_STATE_SEARCH:
             Car_SearchLoop();
             break;
@@ -469,8 +342,6 @@ const char *Car_GetStateName(void)
             return "INIT";
         case CAR_STATE_LINE:
             return "LINE";
-        case CAR_STATE_AVOID:
-            return "AVOID";
         case CAR_STATE_SEARCH:
             return "SRCH";
         case CAR_STATE_STOP:
@@ -484,7 +355,7 @@ const char *Car_GetStateName(void)
 
 uint8_t Car_IsObstacle(void)
 {
-    return (s_state == CAR_STATE_AVOID) ? 1U : 0U;
+    return s_stop_by_obstacle;
 }
 
 uint8_t Car_GetTrackMask(void)

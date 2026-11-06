@@ -43,34 +43,19 @@
 #define CAR_AUTO_RESUME                  1
 
 /* ----------------------------- 超声波避障 ----------------------------- */
+/* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */
 #define CAR_OBSTACLE_ENABLE              1
 #define CAR_OBSTACLE_STOP_CM             20.0f
 #define CAR_OBSTACLE_CLEAR_CM            30.0f   /* 回差，避免边界抖动 */
-#define CAR_OBSTACLE_CLEAR_HOLD_MS       300U
+#define CAR_OBSTACLE_CLEAR_HOLD_MS       300U    /* 超过 CLEAR_CM 后需保持的时间 */
+
+/* 0=障碍物移开且重新看到线后自动恢复循迹；
+ * 1=锁存停车，必须复位/断电（适合“遇到障碍物即结束”） */
+#define CAR_OBSTACLE_STOP_LATCH          0
 
 /* 说明：HC-SR04 在“前方 4m 内没有障碍物”时本来就可能没有回波，
  * 因此无回波按 999cm（前方空旷）处理，避免障碍物移开后一直停车。
  * 串口 U=0 可用于观察本次读数是否有效。 */
-
-/* --------------------------- 超声波绕障参数 --------------------------- */
-/* 绕行方向：+1=从右侧绕，-1=从左侧绕 */
-#define CAR_AVOID_DIR                    (+1)
-#define CAR_AVOID_BRAKE_MS               250U
-#define CAR_AVOID_BACK_SPEED_MPS         0.10f
-#define CAR_AVOID_BACK_MS                200U   /* 最短后退时间 */
-#define CAR_AVOID_BACK_CLEAR_CM          20.0f  /* 后退到该距离再转向 */
-#define CAR_AVOID_BACK_MAX_MS            1000U  /* 后退最长时间 */
-#define CAR_AVOID_TURN_SPEED_MPS         0.18f
-#define CAR_AVOID_TURN_MS                650U   /* 转出角度，约 70~90°，按实车调 */
-#define CAR_AVOID_DRIVE_SPEED_MPS        0.15f
-#define CAR_AVOID_DRIVE_MS               1800U  /* 绕过障碍物的前进时间 */
-#define CAR_AVOID_DRIVE_MAX_MS           3000U  /* 还没绕开时的最长时间 */
-#define CAR_AVOID_TURN_BACK_MS           650U   /* 转回原方向 */
-#define CAR_AVOID_CLEAR_CM               25.0f  /* 距离大于该值认为已绕开 */
-#define CAR_AVOID_REACQUIRE_SPEED_MPS    0.10f
-#define CAR_AVOID_REACQUIRE_TURN_MPS     0.03f  /* 找线时向原线方向回拐 */
-#define CAR_AVOID_REACQUIRE_TIMEOUT_MS   3000U  /* 找不到线就进入原地找线 */
-#define CAR_AVOID_MAX_ATTEMPTS           3U     /* 连续绕不过去就锁定停车 */
 
 /* --------------------------- 电机与编码器 ----------------------------- */
 /* 1=速度闭环（使用编码器）；0=开环占空比 */

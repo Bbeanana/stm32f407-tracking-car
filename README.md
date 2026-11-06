@@ -6,7 +6,7 @@
 
 1. **两路直流无刷电机行驶控制**：PWM + INA/INB + STBY，编码器速度闭环；
 2. **车头八路数字循迹**：加权求偏差 + PD 转向；
-3. **HC-SR04 超声波避障**：前方小于阈值时执行“刹车→后退→转出→直行绕过→转回→重新找线”的绕行动作。
+3. **HC-SR04 超声波避障**：前方小于阈值时立即刹车停车，不再自动绕行；障碍物移开并稳定后，可按配置恢复循迹。
 
 原工程里的 DT7 遥控、MaixCam 视觉、舵机、救援状态机等均已移除。
 
@@ -203,8 +203,9 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 - 车能缓慢前进；
 - 线偏右时左轮加速、右轮减速（车向右修正）；
 - 线偏左时相反；
-- 前方放障碍物，距离小于 `CAR_OBSTACLE_STOP_CM` 时车会先刹车，然后按
-  `刹车 → 后退 → 右转出 → 直行绕过 → 左转回 → 低速找线` 的顺序绕过去。
+- 前方放障碍物，距离小于 `CAR_OBSTACLE_STOP_CM` 时车立即刹车停车；
+  移开障碍物、距离大于 `CAR_OBSTACLE_CLEAR_CM` 并保持
+  `CAR_OBSTACLE_CLEAR_HOLD_MS` 后，如果车仍在线上会自动恢复循迹。
 
 ---
 
@@ -240,37 +241,19 @@ base  = 基础速度 * (1 - 降速比例 * |error|)
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
-| `CAR_OBSTACLE_STOP_CM` | 20 | 小于该距离触发绕行 |
 | `CAR_OBSTACLE_ENABLE` | 1 | 0=关闭超声波避障 |
+| `CAR_OBSTACLE_STOP_CM` | 20 | 小于该距离立即停车 |
+| `CAR_OBSTACLE_CLEAR_CM` | 30 | 大于该距离才允许恢复，形成回差 |
+| `CAR_OBSTACLE_CLEAR_HOLD_MS` | 300 | 超过清除距离后需持续的时间 |
+| `CAR_OBSTACLE_STOP_LATCH` | 0 | 1=锁存停车，必须复位；0=障碍物移开后自动恢复 |
 
-绕行参数（`car_config.h`）：
+行为说明：
 
-| 参数 | 默认 | 说明 |
-|---|---:|---|
-| `CAR_AVOID_DIR` | +1 | +1=右侧绕行，-1=左侧绕行 |
-| `CAR_AVOID_BRAKE_MS` | 250 | 触发后先刹车多久 |
-| `CAR_AVOID_BACK_SPEED_MPS` | 0.10 | 后退速度 |
-| `CAR_AVOID_BACK_MS` | 200 | 最短后退时间 |
-| `CAR_AVOID_BACK_CLEAR_CM` | 20 | 后退到该距离再转向 |
-| `CAR_AVOID_BACK_MAX_MS` | 1000 | 后退最长时间 |
-| `CAR_AVOID_TURN_SPEED_MPS` | 0.18 | 原地转出/转回速度 |
-| `CAR_AVOID_TURN_MS` | 650 | 转出时间（约 70~90°，按实车调） |
-| `CAR_AVOID_DRIVE_SPEED_MPS` | 0.15 | 绕行直行速度 |
-| `CAR_AVOID_DRIVE_MS` | 1800 | 绕行直行时间（约 27cm） |
-| `CAR_AVOID_DRIVE_MAX_MS` | 3000 | 还没绕开时的最长时间 |
-| `CAR_AVOID_TURN_BACK_MS` | 650 | 转回原方向的时间 |
-| `CAR_AVOID_CLEAR_CM` | 25 | 距离大于该值认为已绕开 |
-| `CAR_AVOID_REACQUIRE_SPEED_MPS` | 0.10 | 绕过后低速找线速度 |
-| `CAR_AVOID_REACQUIRE_TURN_MPS` | 0.03 | 找线时向原线方向回拐 |
-| `CAR_AVOID_REACQUIRE_TIMEOUT_MS` | 3000 | 找不到线就进入原地找线 |
-| `CAR_AVOID_MAX_ATTEMPTS` | 3 | 连续 3 次绕不过去就锁定停车 |
+- 障碍物进入 `CAR_OBSTACLE_STOP_CM`（默认 20cm）以内：立即刹车，状态切到 `STOP`，不后退、不转向。
+- 障碍物移开但距离仍小于 `CAR_OBSTACLE_CLEAR_CM`（默认 30cm）：继续停车，防止在阈值附近反复启停。
+- 距离大于 `CAR_OBSTACLE_CLEAR_CM` 并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS` 后：如果车仍在线上，自动恢复循迹。
+- 如果需要“遇到障碍物就永久停车”，把 `CAR_OBSTACLE_STOP_LATCH` 改为 `1`，之后必须复位/断电才能继续。
 
-> 只有一个前向超声波，无法判断左右哪边更空，所以默认固定右绕。
-> 如果赛道右侧空间不够，把 `CAR_AVOID_DIR` 改成 `-1` 左绕。
->
-> 绕行角度/直行距离需要按实车尺寸和速度微调：转少了会蹭障碍物，
-> 转多了会离原线太远。先调 `CAR_AVOID_TURN_MS`，再调 `CAR_AVOID_DRIVE_MS`。
->
 > HC-SR04 在 4m 内没有障碍物时可能没有回波，代码按 999cm（前方空旷）处理。
 > 串口 `U=0` 表示本次没有有效回波，可用来判断传感器是否真的在工作。
 
@@ -306,20 +289,18 @@ base  = 基础速度 * (1 - 降速比例 * |error|)
 ## 5. 状态机
 
 ```text
-INIT ──1.2s──> LINE ──障碍<20cm──> AVOID ──绕完并重新看到线──> LINE
+INIT ──1.2s──> LINE ──障碍<20cm──> STOP ──障碍移开>30cm 并稳定──> LINE
                  │
                  ├──丢线>120ms──> SEARCH ──找到线3次──> LINE
                  │                  └──1.5s未找到──> STOP
                  └──编码器故障──> FAULT
-
-AVOID 内部：
-  刹车 → 后退 → 向一侧转出 → 直行绕过 → 反向转回 → 低速找线
 ```
 
-- `AVOID`：默认右绕，依次执行 `刹车 → 后退 → 右转出 → 直行 → 左转回 → 找线`。
-  连续 3 次绕不过去会锁定停车（`CAR_AVOID_MAX_ATTEMPTS`）。
+- `LINE`：正常循迹；检测到前方障碍物（`< CAR_OBSTACLE_STOP_CM`）立即刹车并进入 `STOP`。
+- `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
+  并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
+  `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
 - `SEARCH`：按最后一次偏差方向原地慢转找线。
-- `STOP`：停车；如果线重新出现可自动恢复（`CAR_AUTO_RESUME=1`）。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -334,7 +315,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0
 
 | 字段 | 含义 |
 |---|---|
-| `S` | 状态：INIT/LINE/OBST/SRCH/STOP/FAULT |
+| `S` | 状态：INIT/LINE/SRCH/STOP/FAULT |
 | `D` | 超声波距离（cm） |
 | `U` | 超声波本次读数是否有效（1=有效） |
 | `M` | 八路循迹掩码（十六进制，bit0=PD2 最左） |
@@ -369,7 +350,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0
 ## 8. 目前没有做的部分
 
 - 没有保留 DT7 遥控和 MaixCam 视觉；
-- 超声波绕行是固定方向（默认右绕），没有左右避障传感器来判断哪边更空；
+- 超声波只做“检测到障碍物就停车”，不判断左右空间，也不会自动绕行；
 - 没有做多传感器融合/里程计；
 - 驱动板 ADC 只做电压遥测，没有换算成电流（需要知道板子的采样电阻/增益）。
 

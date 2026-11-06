@@ -6,9 +6,8 @@
 typedef enum {
     CAR_STATE_INIT = 0,
     CAR_STATE_LINE,
-    CAR_STATE_AVOID,      /* 超声波绕障：刹车→后退→转出→直行→转回→重新找线 */
     CAR_STATE_SEARCH,
-    CAR_STATE_STOP,
+    CAR_STATE_STOP,       /* 停车：含超声波避障停车与丢线超时停车 */
     CAR_STATE_FAULT,
 } CarState_t;
 
