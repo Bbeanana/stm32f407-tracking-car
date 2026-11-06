@@ -223,14 +223,6 @@ static void Car_EnterState(CarState_t state)
  */
 void Car_Init(void)
 {
-    const TrackSensor_Config_t track_cfg = {
-        .port = TRACK_PORT,
-        .first_pin = TRACK_FIRST_PIN,
-        .pin_count = TRACK_PIN_COUNT,
-        .active_level = TRACK_ACTIVE_LEVEL,
-        .reverse_order = TRACK_REVERSE_ORDER,
-    };
-
     const Ultrasonic_Config_t ultra_cfg = {
         .trig_port = ULTRA_TRIG_PORT,
         .trig_pin = ULTRA_TRIG_PIN,
@@ -243,7 +235,7 @@ void Car_Init(void)
     /* 传感器测试/校准：只读编码器，不驱动电机 */
     Motion_SetEnabled(0U);
 #endif
-    TrackSensor_Init(&s_track, &track_cfg);
+    TrackSensor_Init(&s_track);
     Ultrasonic_Init(&s_ultra, &ultra_cfg);
 
     s_state = CAR_STATE_INIT;
@@ -593,6 +585,11 @@ uint8_t Car_GetTrackRawMask(void)
 float Car_GetTrackError(void)
 {
     return TrackSensor_GetError(&s_track);
+}
+
+uint16_t Car_GetTrackAnalog(uint8_t index)
+{
+    return TrackSensor_GetAnalog(&s_track, index);
 }
 
 float Car_GetDistanceCm(void)

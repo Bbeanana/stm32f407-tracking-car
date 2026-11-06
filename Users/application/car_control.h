@@ -21,6 +21,7 @@ uint8_t Car_IsObstacle(void);
 uint8_t Car_GetTrackMask(void);
 uint8_t Car_GetTrackRawMask(void);
 float Car_GetTrackError(void);
+uint16_t Car_GetTrackAnalog(uint8_t index);
 float Car_GetDistanceCm(void);
 uint8_t Car_GetUltrasonicValid(void);
 

@@ -42,11 +42,17 @@ static void Telemetry_PrintCalibration(void)
     }
     bar[8] = '\0';
 
-    printf("CAL RAW=%02X ACT=%02X |%s| E=%+.2f D=%.1f U=%u\r\n",
+    printf("CAL RAW=%02X ACT=%02X |%s| E=%+.2f A=",
            raw,
            act,
            bar,
-           (double)Car_GetTrackError(),
+           (double)Car_GetTrackError());
+
+    for (uint8_t i = 0U; i < 8U; i++) {
+        printf("%u ", Car_GetTrackAnalog(i));
+    }
+
+    printf("D=%.1f U=%u\r\n",
            (double)Car_GetDistanceCm(),
            Car_GetUltrasonicValid());
 }

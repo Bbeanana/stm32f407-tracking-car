@@ -22,10 +22,7 @@
 #define CAR_START_DELAY_MS               1200U
 
 /* ------------------------------ 循迹参数 ------------------------------ */
-/* 传感器：1=黑线输出高电平；0=黑线输出低电平（常见） */
-#define TRACK_ACTIVE_LEVEL               0
-/* 1=通道顺序与车头左右相反（例如模块装反了） */
-#define TRACK_REVERSE_ORDER              0
+/* 幻尔八路 I2C 传感器：黑白方向、地址和引脚见 board_config.h */
 
 #define CAR_LINE_BASE_SPEED_MPS          0.12f
 #define CAR_LINE_MIN_SPEED_MPS           0.04f
@@ -34,7 +31,7 @@
 #define CAR_LINE_KD                      0.12f   /* 增加微分阻尼 */
 #define CAR_LINE_TURN_LIMIT_MPS          0.12f   /* 收紧差速转向限幅 */
 #define CAR_LINE_ERROR_FILTER            0.20f   /* 0~1，越小越平滑 */
-#define CAR_LINE_ERROR_DEADBAND          0.15f   /* 中心附近不做转向，抑制数字量抖动 */
+#define CAR_LINE_ERROR_DEADBAND          0.03f   /* I2C 模拟量连续偏差，中心死区可很小 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
 /* 0=通用左右找线（按最后偏线方向，超时反向）；
