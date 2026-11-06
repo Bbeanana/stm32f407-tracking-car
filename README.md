@@ -257,12 +257,12 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
-| `CAR_LINE_BASE_SPEED_MPS` | 0.12 | 直线基础速度（先低速调试） |
-| `CAR_LINE_MIN_SPEED_MPS` | 0.04 | 大偏差时最低基础速度 |
-| `CAR_LINE_MAX_SPEED_MPS` | 0.30 | 单轮最大速度 |
+| `CAR_LINE_BASE_SPEED_MPS` | 0.18 | 直线基础速度（整体 1.5 倍） |
+| `CAR_LINE_MIN_SPEED_MPS` | 0.06 | 大偏差时最低基础速度 |
+| `CAR_LINE_MAX_SPEED_MPS` | 0.45 | 单轮最大速度 |
 | `CAR_LINE_KP` | 0.24 | 偏差比例系数，越大修正越猛 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.17 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.25 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
@@ -271,7 +271,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_CAMERA_TIMEOUT_MS` | 200 | 摄像头超过该时间没有有效帧就停车 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
-| `CAR_SEARCH_SPEED_MPS` | 0.10 | 原地找线速度 |
+| `CAR_SEARCH_SPEED_MPS` | 0.15 | 原地找线速度 |
 | `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转特化（模式 1）时的单向找线时间 |
 | `CAR_SEARCH_TIMEOUT_MS` | 3400 | 左右弯都有的双向找线总时间 |
 | `CAR_SEARCH_PHASE_MS` | 1200 | 双向模式第一段找线时间，超时后反向 |
@@ -295,14 +295,14 @@ base  = 基础速度 * (1 - 降速比例 * |error|)
 |---|---:|---|
 | `CAR_OBSTACLE_ENABLE` | 1 | 0=关闭超声波避障 |
 | `CAR_OBSTACLE_BEEP_MS` | 200 | 检测到障碍物时蜂鸣时间 |
-| `CAR_OBSTACLE_STOP_CM` | 8 | 小于该距离立即停车 |
+| `CAR_OBSTACLE_STOP_CM` | 10 | 小于该距离立即停车 |
 | `CAR_OBSTACLE_CLEAR_CM` | 15 | 大于该距离才允许恢复，形成回差 |
 | `CAR_OBSTACLE_CLEAR_HOLD_MS` | 300 | 超过清除距离后需持续的时间 |
 | `CAR_OBSTACLE_STOP_LATCH` | 0 | 1=锁存停车，必须复位；0=障碍物移开后自动恢复 |
 
 行为说明：
 
-- 障碍物进入 `CAR_OBSTACLE_STOP_CM`（默认 8cm）以内：立即刹车，状态切到 `STOP`，不后退、不转向。
+- 障碍物进入 `CAR_OBSTACLE_STOP_CM`（默认 10cm）以内：立即刹车，状态切到 `STOP`，不后退、不转向。
 - 障碍物移开但距离仍小于 `CAR_OBSTACLE_CLEAR_CM`（默认 15cm）：继续停车，防止在阈值附近反复启停。
 - 距离大于 `CAR_OBSTACLE_CLEAR_CM` 并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS` 后：如果车仍在线上，自动恢复循迹。
 - 如果需要“遇到障碍物就永久停车”，把 `CAR_OBSTACLE_STOP_LATCH` 改为 `1`，之后必须复位/断电才能继续。
@@ -413,7 +413,7 @@ OB 3         障碍物次数
 | `CAR_SPEED_PID_KI` | 0.25 | 速度环 Ki（降低以抑制积分饱和） |
 | `CAR_SPEED_PID_MAX_INTEGRAL` | 0.40 | 积分限幅 |
 | `CAR_SPEED_FF_GAIN` | 0.80 | 速度前馈，补偿低速死区/起步占空比 |
-| `CAR_SPEED_RAMP_MPS2` | 1.00 | 加减速斜坡，防止起步猛冲 |
+| `CAR_SPEED_RAMP_MPS2` | 1.50 | 加减速斜坡，防止起步猛冲 |
 | `CAR_MAX_WHEEL_SPEED_MPS` | 0.55 | 单轮最大速度 |
 | `CAR_ENCODER_CPR` | 1560 | 输出轴一圈计数（必须标定） |
 | `CAR_WHEEL_RADIUS_M` | 0.0325 | 车轮半径（65mm 轮径） |
@@ -438,7 +438,7 @@ OB 3         障碍物次数
 ## 5. 状态机
 
 ```text
-INIT ──1.2s──> LINE ──障碍<8cm──> STOP ──障碍移开>15cm 并稳定──> LINE
+INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
                  ├──丢线>120ms──> SEARCH ──找到线3次──> LINE
                  │                  └──找线超时──> STOP
