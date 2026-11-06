@@ -159,4 +159,9 @@
 #define CAR_TELEMETRY_PERIOD_MS          200U
 #define CAR_TELEMETRY_CAL_PERIOD_MS      100U
 
+/* 串口屏模式：USART2 只输出 L1/L2/OB 三行，不再输出调试遥测。
+ * 1=只输出圈时/障碍物三行；0=恢复调试遥测。 */
+#define CAR_LAP_SCREEN_ENABLE            1
+#define CAR_LAP_SCREEN_PERIOD_MS         200U
+
 #endif /* CAR_CONFIG_H */

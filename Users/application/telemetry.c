@@ -14,8 +14,11 @@
  */
 void Telemetry_Init(void)
 {
-#if CAR_TELEMETRY_ENABLE
+#if CAR_TELEMETRY_ENABLE || CAR_LAP_SCREEN_ENABLE
     setvbuf(stdout, NULL, _IONBF, 0);
+#endif
+
+#if CAR_TELEMETRY_ENABLE && !CAR_LAP_SCREEN_ENABLE
     printf("\r\n# tracking_car ready\r\n");
 #if CAR_BRINGUP_MODE == 3
     printf("# calibration mode: RAW=raw pins ACT=active mask |bar| E=error D=cm U=valid\r\n");
@@ -85,7 +88,26 @@ static void Telemetry_FormatCurrentLap(char *out, uint8_t out_size)
 
 void Telemetry_Update(void)
 {
-#if CAR_TELEMETRY_ENABLE
+#if CAR_LAP_SCREEN_ENABLE
+    static uint32_t last_tick;
+    uint32_t now = HAL_GetTick();
+
+    if ((uint32_t)(now - last_tick) < CAR_LAP_SCREEN_PERIOD_MS) {
+        return;
+    }
+    last_tick = now;
+
+    char lap1[12];
+    char lap2[12];
+
+    Telemetry_FormatLap(lap1, sizeof(lap1), 0U);
+    Telemetry_FormatLap(lap2, sizeof(lap2), 1U);
+
+    printf("L1=%s\r\nL2=%s\r\nOB=%lu\r\n",
+           lap1,
+           lap2,
+           (unsigned long)LapTimer_GetObstacleCount());
+#elif CAR_TELEMETRY_ENABLE
     static uint32_t last_tick;
 
     uint32_t period = CAR_TELEMETRY_PERIOD_MS;
