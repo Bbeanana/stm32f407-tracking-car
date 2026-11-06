@@ -28,6 +28,7 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 static uint8_t s_line_ever_seen;
+static uint32_t s_line_lost_tick;
 
 /* 摄像头 CURV 直角弯检测状态 */
 static uint8_t s_cam_corner_active;
@@ -57,6 +58,7 @@ static uint32_t s_arc_entry_tick;
 static uint32_t s_arc_exit_tick;
 static uint8_t s_arc_suppressed;
 static uint32_t s_arc_resume_tick;
+static uint32_t s_arc_last_beep_tick;
 
 /* CURV 历史移动平均，用于抑制圆弧中间的短时抖动 */
 static float s_curv_hist[CAR_CAM_ARC_CURV_FILTER_N];
@@ -113,6 +115,19 @@ static void Car_ArcReset(uint8_t suppress, uint32_t now)
         s_arc_suppressed = 0U;
         s_arc_resume_tick = 0U;
     }
+}
+
+/* 圆弧提示统一入口：限制两声之间的最小间隔，避免连续鸣叫 */
+static void Car_ArcBeep(uint32_t now)
+{
+    if (s_arc_last_beep_tick != 0U &&
+        (uint32_t)(now - s_arc_last_beep_tick) <
+            CAR_ARC_BEEP_MIN_GAP_MS) {
+        return;
+    }
+
+    Buzzer_Beep(CAR_ARC_BEEP_MS);
+    s_arc_last_beep_tick = now;
 }
 
 /**
@@ -181,7 +196,7 @@ static void Car_ArcUpdate(uint32_t now)
                 s_arc_peak = abs_curv;
                 s_arc_exit_tick = 0U;
                 s_arc_stage = 1U;
-                Buzzer_Beep(CAR_ARC_BEEP_MS);
+                Car_ArcBeep(now);
             }
         } else {
             s_arc_candidate_tick = 0U;
@@ -211,7 +226,7 @@ static void Car_ArcUpdate(uint32_t now)
                 s_arc_active = 0U;
                 s_arc_exit_tick = 0U;
                 s_arc_stage = 2U;
-                Buzzer_Beep(CAR_ARC_BEEP_MS);
+                Car_ArcBeep(now);
             }
         } else {
             s_arc_exit_tick = 0U;
@@ -268,6 +283,7 @@ static void Car_EnterState(CarState_t state)
         s_cam_corner_exit_tick = 0U;
         s_cam_corner_low_tick = 0U;
 
+        s_line_lost_tick = 0U;
         s_error_filtered = TrackSensor_GetError(&s_track);
         s_last_error = s_error_filtered;
 
@@ -321,6 +337,7 @@ void Car_Init(void)
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
     s_line_ever_seen = 0U;
+    s_line_lost_tick = 0U;
 #if !CAR_RIGHT_TURNS_ONLY
     s_last_turn_hint = 0.0f;
     s_last_turn_hint_tick = 0U;
@@ -434,6 +451,19 @@ static void Car_LineLoop(void)
         return;
     }
 
+    /* 黑线消失：短暂确认后直接制动，不原地旋转找线 */
+    if (TrackSensor_IsLost(&s_track)) {
+        if (s_line_lost_tick == 0U) {
+            s_line_lost_tick = now;
+        } else if ((uint32_t)(now - s_line_lost_tick) >=
+                   CAR_LOST_STOP_MS) {
+            Motion_Brake();
+            return;
+        }
+    } else {
+        s_line_lost_tick = 0U;
+    }
+
     s_line_ever_seen = 1U;
     float error = Camera_GetError();
 
@@ -478,52 +508,14 @@ static void Car_LineLoop(void)
 }
 
 /**
- * @brief 丢线/直角弯搜索：先按最后偏线方向原地转，超时后反向再找
+ * @brief 丢线处理：不原地旋转找线，保持制动；线重新出现后恢复循迹
  */
 static void Car_SearchLoop(void)
 {
-    uint32_t now = HAL_GetTick();
+    Motion_Brake();
 
     if (!TrackSensor_IsLost(&s_track)) {
-        if (s_line_seen_count < 250U) {
-            s_line_seen_count++;
-        }
-        if (s_line_seen_count >= 3U) {
-            Car_EnterState(CAR_STATE_LINE);
-            return;
-        }
-    } else {
-        s_line_seen_count = 0U;
-    }
-
-#if CAR_RIGHT_TURNS_ONLY
-    uint32_t search_timeout = CAR_SEARCH_RIGHT_TIMEOUT_MS;
-#else
-    uint32_t search_timeout = CAR_SEARCH_TIMEOUT_MS;
-#endif
-
-    if ((uint32_t)(now - s_state_tick) > search_timeout) {
-        Motion_Brake();
-        Car_EnterState(CAR_STATE_STOP);
-        return;
-    }
-
-#if !CAR_RIGHT_TURNS_ONLY
-    /* 第一段没找到线就立即反向，避免方向提示错误时一直转下去 */
-    if (s_search_phase == 0U &&
-        (uint32_t)(now - s_search_phase_tick) >= CAR_SEARCH_PHASE_MS) {
-        s_search_dir = (int8_t)(-s_search_dir);
-        s_search_phase = 1U;
-        s_search_phase_tick = now;
-    }
-#endif
-
-    float search = CAR_SEARCH_SPEED_MPS;
-    if (s_search_dir > 0) {
-        /* 线原先在右侧：左轮前进、右轮后退 → 原地右转 */
-        Motion_SetWheelSpeeds(search, -search);
-    } else {
-        Motion_SetWheelSpeeds(-search, search);
+        Car_EnterState(CAR_STATE_LINE);
     }
 }
 

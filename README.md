@@ -270,14 +270,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_CAMERA_TIMEOUT_MS` | 200 | 摄像头超过该时间没有有效帧就停车 |
-| `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
-| `CAR_SEARCH_SPEED_MPS` | 0.204 | 原地找线速度 |
-| `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转特化（模式 1）时的单向找线时间 |
-| `CAR_SEARCH_TIMEOUT_MS` | 3400 | 左右弯都有的双向找线总时间 |
-| `CAR_SEARCH_PHASE_MS` | 1200 | 双向模式第一段找线时间，超时后反向 |
-| `CAR_SEARCH_HINT_MS` | 800 | 双向模式丢线前方向提示的有效期 |
-| `CAR_SEARCH_HINT_MIN_ERROR` | 0.10 | 记录方向提示的最小偏差 |
-| `CAR_SEARCH_DEFAULT_DIR` | +1 | 双向模式没有方向提示时先向右转 |
+| `CAR_LOST_STOP_MS` | 250 | 黑线消失后多久制动（不旋转找线） |
 
 控制律：
 
@@ -353,6 +346,7 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 |---|---:|---|
 | `CAR_ARC_BEEP_ENABLE` | 1 | 0=关闭圆弧提示 |
 | `CAR_ARC_BEEP_MS` | 80 | 每次提示鸣叫时间 |
+| `CAR_ARC_BEEP_MIN_GAP_MS` | 3000 | 任意两声圆弧提示的最小间隔 |
 | `CAR_CAM_ARC_ENTER_DEG` | 8 | 进入圆弧的 CURV 阈值 |
 | `CAR_CAM_ARC_EXIT_DEG` | 4 | 退出圆弧的 CURV 阈值 |
 | `CAR_CAM_ARC_MAX_DEG` | 40 | 超过该值按直角弯处理 |
@@ -456,8 +450,7 @@ OB 3         障碍物次数
 ```text
 INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
-                 ├──丢线>120ms──> SEARCH ──找到线3次──> LINE
-                 │                  └──找线超时──> STOP
+                 ├──黑线消失>250ms──> 制动（保持 LINE，不旋转找线）
                  └──编码器故障──> FAULT
 ```
 
@@ -465,15 +458,9 @@ INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15c
 - `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
   并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
   `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
-- `SEARCH`：默认 `CAR_RIGHT_TURNS_ONLY=0`，优先按丢线前最后一次有效偏线
-  方向原地转，`CAR_SEARCH_PHASE_MS` 内没找到就反向再找，总时间超过
-  `CAR_SEARCH_TIMEOUT_MS` 后停车。
-  如果确定赛道只有右转，可把 `CAR_RIGHT_TURNS_ONLY` 改成 `1`，找线会固定
-  向右并使用 `CAR_SEARCH_RIGHT_TIMEOUT_MS` 单向超时。
-- 底盘为**两个后轮差速驱动 + 前万向轮**：原地找线时绕后轴旋转，车头的
-  八路传感器会扫过直角弯后的线。找线速度取 0.204m/s，避免车头扫得太快漏线。
-- 上电后从未检测到线时，`CAR_START_REQUIRE_LINE=1` 会先停车，不进入
-  `SEARCH`，避免传感器没接线或车没放正时一上电就原地右转。
+- 黑线消失：前八路持续丢线超过 `CAR_LOST_STOP_MS` 时直接制动，不再进入
+  `SEARCH` 原地旋转找线；线重新出现后继续循迹。
+- 摄像头模式下不再使用 `SEARCH` 状态；摄像头无有效帧时也会制动。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -532,12 +519,12 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.0
 | 现象 | 排查 |
 |---|---|
 | 上电不跑 | 看串口是否停在 `INIT`；检查 `CAR_START_DELAY_MS`、电机 STBY |
-| 上电后原地右转 | 传感器没有检测到线，程序进入了 `SEARCH`；检查车头传感器是否压在线上、`M=` 是否非 0、`TRACK_ACTIVE_LEVEL` 是否配反。若上电后从未见过线，`CAR_START_REQUIRE_LINE=1` 会改为停车 |
+| 黑线消失后不停车 | 检查前八路 `M=` 是否一直为非零；确认 `CAR_LOST_STOP_MS` 和 `TRACK_ACTIVE_LEVEL` |
 | 一给速度就报 `F=1` | 编码器方向反了，改 `CAR_ENCODER_*_INVERT` 或对调 A/B |
 | 一给速度就报 `F=2` | 编码器没信号/没接，检查 VCC/GND/A/B |
 | 车直线画龙 | 降低 `CAR_LINE_KP`，适当加 `CAR_LINE_KD`，或减小 `CAR_LINE_ERROR_FILTER` |
 | 弯道冲出线 | 降低 `CAR_LINE_BASE_SPEED_MPS`，加大 `CAR_LINE_KP` |
-| 直角弯丢线后转不回来 | 增大 `CAR_SEARCH_PHASE_MS`/`CAR_SEARCH_TIMEOUT_MS`，检查 `CAR_SEARCH_DEFAULT_DIR`；实车看丢线前 `E=` 的符号是否正确 |
+| 直角弯丢线后转不回来 | 该版本已取消原地找线；检查摄像头 `ERR/CURV` 和直角弯增益 `CAR_LINE_KP` |
 | 循迹掩码全 0 | `TRACK_ACTIVE_LEVEL` 配反，或传感器没供电 |
 | 循迹掩码全 1 | 同上；也可能是车不在线上 |
 | 超声波一直 999 或不变 | ECHO 没接 PA0、模块没供电、TRIG 电平不够 |
@@ -547,7 +534,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.0
 | OLED 花屏/整体偏移 | 模块可能是 SH1106，把 `OLED_SH1106` 改成 1；或供电/上拉不稳 |
 | OLED 文字镜像/倒置 | 改 `OLED_FLIP_X` 或 `OLED_FLIP_Y` |
 | 圈数少计/多计 | 看摄像头 HUD 的 `CURV` 峰值；直角弯没超过 `CAR_CAM_CORNER_ENTER_DEG` 就调低，圆弧误计数就调高 |
-| 障碍物次数不增加 | 确认 `CAR_OBSTACLE_ENABLE=1`，且 `S=STOP` 是由障碍物触发而不是找线超时 |
+| 障碍物次数不增加 | 确认 `CAR_OBSTACLE_ENABLE=1`，且 `S=STOP` 是由障碍物触发 |
 | 蜂鸣器不响 | 确认 I/O 接 PB0、模块 VCC/GND 已接；用万用表看 PB0 上电后是否为高（不响）、鸣叫时是否为低 |
 | 蜂鸣器上电一直响 | 模块实际是高电平触发，把 `BUZZER_ACTIVE_LEVEL` 改成 1 |
 
