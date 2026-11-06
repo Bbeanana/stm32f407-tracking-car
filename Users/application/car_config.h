@@ -70,6 +70,7 @@
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */
 /* 当前临时关闭，先纯调速度环/PID；调好后改回 1。 */
 #define CAR_OBSTACLE_ENABLE              1
+#define CAR_OBSTACLE_BEEP_MS             200U    /* 检测到障碍物时短鸣 */
 #define CAR_OBSTACLE_STOP_CM             8.0f
 #define CAR_OBSTACLE_CLEAR_CM            15.0f   /* 回差，避免边界抖动 */
 #define CAR_OBSTACLE_CLEAR_HOLD_MS       300U    /* 超过 CLEAR_CM 后需保持的时间 */

@@ -294,6 +294,7 @@ static void Car_LineLoop(void)
     if (Car_ObstacleDetected()) {
         /* 检测到障碍物只停车，不再执行后退/转向绕行 */
         Motion_Brake();
+        Buzzer_Beep(CAR_OBSTACLE_BEEP_MS);
         Car_EnterState(CAR_STATE_STOP);
         s_stop_by_obstacle = 1U;
         return;

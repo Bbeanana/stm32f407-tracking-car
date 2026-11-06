@@ -294,6 +294,7 @@ base  = 基础速度 * (1 - 降速比例 * |error|)
 | 参数 | 默认 | 说明 |
 |---|---:|---|
 | `CAR_OBSTACLE_ENABLE` | 1 | 0=关闭超声波避障 |
+| `CAR_OBSTACLE_BEEP_MS` | 200 | 检测到障碍物时蜂鸣时间 |
 | `CAR_OBSTACLE_STOP_CM` | 8 | 小于该距离立即停车 |
 | `CAR_OBSTACLE_CLEAR_CM` | 15 | 大于该距离才允许恢复，形成回差 |
 | `CAR_OBSTACLE_CLEAR_HOLD_MS` | 300 | 超过清除距离后需持续的时间 |
