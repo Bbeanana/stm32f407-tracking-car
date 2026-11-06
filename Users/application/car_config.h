@@ -33,9 +33,9 @@
 #define CAR_LINE_BASE_SPEED_MPS          0.24f
 #define CAR_LINE_MIN_SPEED_MPS           0.084f
 #define CAR_LINE_MAX_SPEED_MPS           0.60f
-#define CAR_LINE_KP                      0.24f   /* 介于灵敏和稳定之间 */
+#define CAR_LINE_KP                      0.34f   /* 提高直角弯转向速度 */
 #define CAR_LINE_KD                      0.10f   /* 增加阻尼，抑制来回摆 */
-#define CAR_LINE_TURN_LIMIT_MPS          0.336f  /* 再提速 20% 后同步放大 */
+#define CAR_LINE_TURN_LIMIT_MPS          0.42f   /* 提高直角弯转向速度 */
 #define CAR_LINE_ERROR_FILTER            0.25f   /* 平滑一点，减少高频抖动 */
 #define CAR_LINE_ERROR_DEADBAND          0.08f   /* 小死区，避免过度修正 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
@@ -80,10 +80,11 @@
 /* 摄像头 CURV 圆弧检测：直道约 0°，圆弧约 8~35°，直角弯 >45°。
  * 只用于圆弧进出蜂鸣，不参与转向。 */
 #define CAR_CAM_ARC_ENTER_DEG            8.0f
-#define CAR_CAM_ARC_EXIT_DEG             4.0f
+#define CAR_CAM_ARC_EXIT_DEG             2.0f
 #define CAR_CAM_ARC_MAX_DEG              40.0f  /* 超过该值按直角弯处理，不蜂鸣 */
 #define CAR_CAM_ARC_ENTER_MS             100U
-#define CAR_CAM_ARC_EXIT_MS              120U
+#define CAR_CAM_ARC_EXIT_MS              300U
+#define CAR_CAM_ARC_MIN_MS               400U   /* 入弯后至少这么久才允许出弯 */
 
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */

@@ -52,6 +52,7 @@ static uint8_t s_arc_active;
 static uint8_t s_arc_stage;   /* 0=本圈未入弯, 1=已入弯, 2=已出弯 */
 static uint8_t s_arc_lap;
 static uint32_t s_arc_candidate_tick;
+static uint32_t s_arc_entry_tick;
 static uint32_t s_arc_exit_tick;
 static uint8_t s_arc_suppressed;
 static uint32_t s_arc_resume_tick;
@@ -63,6 +64,7 @@ static void Car_ArcReset(uint8_t suppress, uint32_t now)
 {
     s_arc_active = 0U;
     s_arc_candidate_tick = 0U;
+    s_arc_entry_tick = 0U;
     s_arc_exit_tick = 0U;
 
     if (suppress) {
@@ -100,6 +102,7 @@ static void Car_ArcUpdate(uint32_t now)
             s_arc_stage = 0U;
             s_arc_active = 0U;
             s_arc_candidate_tick = 0U;
+            s_arc_entry_tick = 0U;
             s_arc_exit_tick = 0U;
         }
     }
@@ -131,6 +134,7 @@ static void Car_ArcUpdate(uint32_t now)
                        CAR_CAM_ARC_ENTER_MS) {
                 s_arc_candidate_tick = 0U;
                 s_arc_active = 1U;
+                s_arc_entry_tick = now;
                 s_arc_exit_tick = 0U;
                 s_arc_stage = 1U;
                 Buzzer_Beep(CAR_ARC_BEEP_MS);
@@ -139,6 +143,12 @@ static void Car_ArcUpdate(uint32_t now)
             s_arc_candidate_tick = 0U;
         }
     } else if (s_arc_stage == 1U) {
+        /* 防止圆弧中间 CURV 短时掉到 0 附近时提前报出弯 */
+        if ((uint32_t)(now - s_arc_entry_tick) < CAR_CAM_ARC_MIN_MS) {
+            s_arc_exit_tick = 0U;
+            return;
+        }
+
         if (abs_curv <= CAR_CAM_ARC_EXIT_DEG) {
             if (s_arc_exit_tick == 0U) {
                 s_arc_exit_tick = now;
