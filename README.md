@@ -257,22 +257,19 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
-| `CAR_LINE_BASE_SPEED_MPS` | 0.24 | 直线基础速度（再提速 20%） |
-| `CAR_LINE_MIN_SPEED_MPS` | 0.084 | 大偏差时最低基础速度 |
-| `CAR_LINE_MAX_SPEED_MPS` | 0.60 | 单轮最大速度 |
+| `CAR_LINE_BASE_SPEED_MPS` | 0.20 | 直线基础速度（降速） |
+| `CAR_LINE_MIN_SPEED_MPS` | 0.07 | 大偏差时最低基础速度 |
+| `CAR_LINE_MAX_SPEED_MPS` | 0.50 | 单轮最大速度 |
 | `CAR_LINE_KP` | 0.24 | 偏差比例系数，兼顾转向和稳定 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.336 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.28 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `TRACK_LPF_ALPHA` | 0.15 | 每路 0/1 的一阶低通系数，越小越平滑但越滞后 |
-| `CAR_RIGHT_TURNS_ONLY` | 0 | 旧版找线方向配置；当前丢线固定右转，基本不再使用 |
+| `CAR_RIGHT_TURNS_ONLY` | 0 | 旧版找线配置；当前不使用 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_CAMERA_TIMEOUT_MS` | 200 | 摄像头超过该时间没有有效帧就停车 |
-| `CAR_LOST_STOP_MS` | 250 | 黑线消失后多久开始固定右转 |
-| `CAR_RIGHT_TURN_SPEED_MPS` | 0.18 | 丢线后固定右转速度 |
-| `CAR_RIGHT_TURN_MS` | 650 | 固定右转持续时间（约 90°） |
 
 控制律：
 
@@ -425,8 +422,8 @@ OB 3         障碍物次数
 | `CAR_SPEED_PID_KI` | 0.25 | 速度环 Ki（降低以抑制积分饱和） |
 | `CAR_SPEED_PID_MAX_INTEGRAL` | 0.40 | 积分限幅 |
 | `CAR_SPEED_FF_GAIN` | 0.80 | 速度前馈，补偿低速死区/起步占空比 |
-| `CAR_SPEED_RAMP_MPS2` | 2.04 | 加减速斜坡，防止起步猛冲 |
-| `CAR_MAX_WHEEL_SPEED_MPS` | 0.66 | 单轮最大速度 |
+| `CAR_SPEED_RAMP_MPS2` | 1.70 | 加减速斜坡，防止起步猛冲 |
+| `CAR_MAX_WHEEL_SPEED_MPS` | 0.55 | 单轮最大速度 |
 | `CAR_ENCODER_CPR` | 1560 | 输出轴一圈计数（必须标定） |
 | `CAR_WHEEL_RADIUS_M` | 0.0325 | 车轮半径（65mm 轮径） |
 | `CAR_TRACK_WIDTH_M` | 0.150 | 左右轮中心距，仅转向解算用 |
@@ -452,8 +449,7 @@ OB 3         障碍物次数
 ```text
 INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
-                 ├──黑线消失>250ms──> 固定右转约90° ──找到线──> LINE
-                 │                              └──转完仍无线──> 停车
+                 ├──摄像头无有效帧──> 制动
                  └──编码器故障──> FAULT
 ```
 
@@ -461,10 +457,9 @@ INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15c
 - `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
   并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
   `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
-- 黑线消失：前八路持续丢线超过 `CAR_LOST_STOP_MS` 后按直角弯处理，
-  固定向右转约 90°（`CAR_RIGHT_TURN_MS`）；转到线重新出现就恢复循迹，
-  转完仍没有线则停车，不再来回旋转找线。
-- 摄像头无有效帧时直接制动，不进入右转恢复。
+- 当前不再对前八路丢线做特殊处理，也不旋转找线；循迹仍只看摄像头
+  `ERR`，摄像头无有效帧时直接制动。
+- `Car_SearchLoop` 仅保留为空实现，正常流程不会进入。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -523,12 +518,12 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.0
 | 现象 | 排查 |
 |---|---|
 | 上电不跑 | 看串口是否停在 `INIT`；检查 `CAR_START_DELAY_MS`、电机 STBY |
-| 黑线消失后不右转 | 检查前八路是否真的全丢线（`M=0`），确认 `TRACK_ACTIVE_LEVEL`、`CAR_LOST_STOP_MS` 和右转参数 |
+
 | 一给速度就报 `F=1` | 编码器方向反了，改 `CAR_ENCODER_*_INVERT` 或对调 A/B |
 | 一给速度就报 `F=2` | 编码器没信号/没接，检查 VCC/GND/A/B |
 | 车直线画龙 | 降低 `CAR_LINE_KP`，适当加 `CAR_LINE_KD`，或减小 `CAR_LINE_ERROR_FILTER` |
 | 弯道冲出线 | 降低 `CAR_LINE_BASE_SPEED_MPS`，加大 `CAR_LINE_KP` |
-| 直角弯丢线后转不回来 | 该版本已取消原地找线；检查摄像头 `ERR/CURV` 和直角弯增益 `CAR_LINE_KP` |
+| 直角弯丢线后转不回来 | 当前版本不做丢线恢复；检查摄像头 `ERR/CURV` 和转向参数 |
 | 循迹掩码全 0 | `TRACK_ACTIVE_LEVEL` 配反，或传感器没供电 |
 | 循迹掩码全 1 | 同上；也可能是车不在线上 |
 | 超声波一直 999 或不变 | ECHO 没接 PA0、模块没供电、TRIG 电平不够 |

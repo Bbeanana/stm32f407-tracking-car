@@ -30,12 +30,12 @@
 /* 摄像头帧超时：超过该时间没有收到有效包就停车 */
 #define CAR_CAMERA_TIMEOUT_MS             200U
 
-#define CAR_LINE_BASE_SPEED_MPS          0.24f
-#define CAR_LINE_MIN_SPEED_MPS           0.084f
-#define CAR_LINE_MAX_SPEED_MPS           0.60f
+#define CAR_LINE_BASE_SPEED_MPS          0.20f
+#define CAR_LINE_MIN_SPEED_MPS           0.07f
+#define CAR_LINE_MAX_SPEED_MPS           0.50f
 #define CAR_LINE_KP                      0.24f   /* 介于灵敏和稳定之间 */
 #define CAR_LINE_KD                      0.10f   /* 增加阻尼，抑制来回摆 */
-#define CAR_LINE_TURN_LIMIT_MPS          0.336f  /* 再提速 20% 后同步放大 */
+#define CAR_LINE_TURN_LIMIT_MPS          0.28f   /* 降速后同步调整 */
 #define CAR_LINE_ERROR_FILTER            0.25f   /* 平滑一点，减少高频抖动 */
 #define CAR_LINE_ERROR_DEADBAND          0.08f   /* 小死区，避免过度修正 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
@@ -48,12 +48,8 @@
  * 避免车没放正/传感器没接线时一上电就原地右转。 */
 #define CAR_START_REQUIRE_LINE           1
 
-/* 丢线/直角弯找线：短暂保持上一次偏差，超过时间则原地找线。
- * 底盘是后轮差速 + 前万向轮，原地转向时绕后轴旋转，车头传感器扫过弯后的线。 */
-#define CAR_LOST_STOP_MS                 250U   /* 黑线消失确认时间，随后按直角弯右转 */
-#define CAR_RIGHT_TURN_SPEED_MPS         0.18f  /* 丢线后固定右转速度 */
-#define CAR_RIGHT_TURN_MS                650U   /* 固定右转持续时间，约 90 度 */
-#define CAR_SEARCH_SPEED_MPS             0.204f
+/* 旧版丢线找线参数保留，当前摄像头模式不使用。 */
+#define CAR_SEARCH_SPEED_MPS             0.17f
 #define CAR_SEARCH_TIMEOUT_MS            3400U   /* 左右弯都有的双向找线时间 */
 #define CAR_SEARCH_RIGHT_TIMEOUT_MS      2200U   /* 只有右转时单向找线时间 */
 #define CAR_SEARCH_PHASE_MS              1200U   /* 双向模式第一段找线时间 */
@@ -135,8 +131,8 @@
 #define CAR_TRACK_WIDTH_M                0.150f
 
 /* 单轮最大线速度与加减速斜坡 */
-#define CAR_MAX_WHEEL_SPEED_MPS          0.66f
-#define CAR_SPEED_RAMP_MPS2              2.04f   /* 再提速 20% 后同步放大 */
+#define CAR_MAX_WHEEL_SPEED_MPS          0.55f
+#define CAR_SPEED_RAMP_MPS2              1.70f   /* 降速后同步调整 */
 #define CAR_SPEED_DEADBAND_MPS           0.004f
 #define CAR_SPEED_STOP_EPS_MPS           0.020f
 #define CAR_WHEEL_TRIM_L                 1.000f

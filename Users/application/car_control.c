@@ -28,7 +28,6 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 static uint8_t s_line_ever_seen;
-static uint32_t s_line_lost_tick;
 
 /* 摄像头 CURV 直角弯检测状态 */
 static uint8_t s_cam_corner_active;
@@ -283,7 +282,6 @@ static void Car_EnterState(CarState_t state)
         s_cam_corner_exit_tick = 0U;
         s_cam_corner_low_tick = 0U;
 
-        s_line_lost_tick = 0U;
         s_error_filtered = TrackSensor_GetError(&s_track);
         s_last_error = s_error_filtered;
 
@@ -337,7 +335,6 @@ void Car_Init(void)
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
     s_line_ever_seen = 0U;
-    s_line_lost_tick = 0U;
 #if !CAR_RIGHT_TURNS_ONLY
     s_last_turn_hint = 0.0f;
     s_last_turn_hint_tick = 0U;
@@ -451,19 +448,6 @@ static void Car_LineLoop(void)
         return;
     }
 
-    /* 黑线消失：大概率是直角弯，确认后固定向右转，不来回旋转找线 */
-    if (TrackSensor_IsLost(&s_track)) {
-        if (s_line_lost_tick == 0U) {
-            s_line_lost_tick = now;
-        } else if ((uint32_t)(now - s_line_lost_tick) >=
-                   CAR_LOST_STOP_MS) {
-            Car_EnterState(CAR_STATE_SEARCH);
-            return;
-        }
-    } else {
-        s_line_lost_tick = 0U;
-    }
-
     s_line_ever_seen = 1U;
     float error = Camera_GetError();
 
@@ -508,26 +492,13 @@ static void Car_LineLoop(void)
 }
 
 /**
- * @brief 丢线/直角弯处理：固定向右转约 90 度，不来回旋转找线
+ * @brief 旧版丢线状态：当前不使用旋转找线
  */
 static void Car_SearchLoop(void)
 {
-    uint32_t now = HAL_GetTick();
-
-    if (!TrackSensor_IsLost(&s_track)) {
-        Car_EnterState(CAR_STATE_LINE);
-        return;
-    }
-
-    if ((uint32_t)(now - s_state_tick) < CAR_RIGHT_TURN_MS) {
-        /* 左轮前进、右轮后退 → 原地右转 */
-        Motion_SetWheelSpeeds(CAR_RIGHT_TURN_SPEED_MPS,
-                              -CAR_RIGHT_TURN_SPEED_MPS);
-    } else {
-        /* 转完仍没有线：停车，不再继续旋转找线 */
-        Motion_Brake();
-    }
+    Motion_Brake();
 }
+
 
 /**
  * @brief 停车状态：障碍物移开且线重新出现后可自动恢复（可配置）
