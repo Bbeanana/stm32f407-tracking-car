@@ -289,6 +289,8 @@ static uint8_t Car_ObstacleDetected(void)
  */
 static void Car_LineLoop(void)
 {
+    uint32_t now = HAL_GetTick();
+
     if (Car_ObstacleDetected()) {
         /* 检测到障碍物只停车，不再执行后退/转向绕行 */
         Motion_Brake();
@@ -305,6 +307,9 @@ static void Car_LineLoop(void)
 
     s_line_ever_seen = 1U;
     float error = Camera_GetError();
+
+    /* 仅保留圆弧蜂鸣提示；前八路不参与转向 */
+    Car_ArcUpdate(now, error, 0U, 0U);
 
     s_error_filtered +=
         CAR_LINE_ERROR_FILTER * (error - s_error_filtered);
