@@ -110,23 +110,20 @@ void Camera_UartIrqHandler(void)
     }
 }
 
-static void Camera_ParseFrame(uint8_t length)
+static void Camera_ParseFrame(void)
 {
     float err;
     float ang;
-    float curv = 0.0f;
+    float curv;
 
-    if (s_packet[length - 1U] != 0x5AU) {
+    if (s_packet[13] != 0x5AU) {
         g_camera_bad_frames++;
         return;
     }
 
     memcpy(&err, &s_packet[1], sizeof(float));
     memcpy(&ang, &s_packet[5], sizeof(float));
-
-    if (length >= 14U) {
-        memcpy(&curv, &s_packet[9], sizeof(float));
-    }
+    memcpy(&curv, &s_packet[9], sizeof(float));
 
     if (err != err || ang != ang || curv != curv) {   /* NaN */
         return;
@@ -163,29 +160,12 @@ void Camera_Update(void)
             s_packet[s_packet_index++] = data;
         }
 
-        /* 兼容旧 10 字节帧：A5 + ERR + ANG + 5A。
-         * 10 字节帧后面紧跟下一帧的 A5 时，可以无歧义识别。 */
-        if (s_packet_index == 11U &&
-            s_packet[9] == 0x5AU && s_packet[10] == 0xA5U) {
-            for (uint8_t i = 0U; i < CAMERA_FRAME_LEN; i++) {
-                g_camera_last_packet[i] = (i < 10U) ? s_packet[i] : 0U;
-            }
-
-            Camera_ParseFrame(10U);
-
-            /* 当前字节是下一帧的帧头，直接开始下一帧 */
-            s_packet[0] = 0xA5U;
-            s_packet_index = 1U;
-            s_in_frame = 1U;
-            continue;
-        }
-
         if (s_packet_index >= CAMERA_FRAME_LEN) {
             for (uint8_t i = 0U; i < CAMERA_FRAME_LEN; i++) {
                 g_camera_last_packet[i] = s_packet[i];
             }
 
-            Camera_ParseFrame(CAMERA_FRAME_LEN);
+            Camera_ParseFrame();
 
             s_in_frame = 0U;
             s_packet_index = 0U;
