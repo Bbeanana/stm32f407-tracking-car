@@ -66,9 +66,10 @@
 #define CAR_LAP_COUNT                    2U
 #define CAR_LAP_CORNER_DEBOUNCE_MS       300U  /* 同一个弯道重复触发时防重复计数 */
 
-/* 摄像头 CURV 直角弯检测：圆弧约 0~30°，直角弯通常 >45° */
+/* 摄像头 CURV 直角弯检测：圆弧约 0~30°，直角弯通常 >45°。
+ * 退出阈值要高于圆弧的 CURV，否则跑完直角弯后进圆弧时无法复位。 */
 #define CAR_CAM_CORNER_ENTER_DEG         45.0f
-#define CAR_CAM_CORNER_EXIT_DEG          15.0f
+#define CAR_CAM_CORNER_EXIT_DEG          30.0f
 #define CAR_CAM_CORNER_ENTER_MS          40U
 #define CAR_CAM_CORNER_EXIT_MS           100U
 

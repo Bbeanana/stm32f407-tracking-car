@@ -31,8 +31,10 @@ static uint8_t s_line_ever_seen;
 
 /* 摄像头 CURV 直角弯检测状态 */
 static uint8_t s_cam_corner_active;
+static uint8_t s_cam_corner_low_seen;
 static uint32_t s_cam_corner_entry_tick;
 static uint32_t s_cam_corner_exit_tick;
+static uint32_t s_cam_corner_low_tick;
 
 #if !CAR_RIGHT_TURNS_ONLY
 /* 左右弯都可能时，记录丢线前最后一次有效偏差的方向 */
@@ -210,6 +212,13 @@ static void Car_EnterState(CarState_t state)
     }
 
     if (state == CAR_STATE_LINE) {
+        /* 进入循迹时重新武装直角弯检测，避免起点残留 CURV 造成误计数 */
+        s_cam_corner_active = 0U;
+        s_cam_corner_low_seen = 0U;
+        s_cam_corner_entry_tick = 0U;
+        s_cam_corner_exit_tick = 0U;
+        s_cam_corner_low_tick = 0U;
+
         s_error_filtered = TrackSensor_GetError(&s_track);
         s_last_error = s_error_filtered;
 
@@ -301,16 +310,32 @@ static void Car_CameraCornerUpdate(uint32_t now)
     float abs_curv = fabsf(Camera_GetCurvatureDeg());
 
     if (!s_cam_corner_active) {
-        if (abs_curv >= CAR_CAM_CORNER_ENTER_DEG) {
+        /* 必须先看到一段低 CURV，才允许进入直角弯。
+         * 这样起点停在弯道末端、残留高 CURV 时不会多计一个弯。 */
+        if (abs_curv <= CAR_CAM_CORNER_EXIT_DEG) {
+            if (s_cam_corner_low_tick == 0U) {
+                s_cam_corner_low_tick = now;
+            } else if ((uint32_t)(now - s_cam_corner_low_tick) >=
+                       CAR_CAM_CORNER_EXIT_MS) {
+                s_cam_corner_low_seen = 1U;
+            }
+        } else {
+            s_cam_corner_low_tick = 0U;
+        }
+
+        if (s_cam_corner_low_seen &&
+            abs_curv >= CAR_CAM_CORNER_ENTER_DEG) {
             if (s_cam_corner_entry_tick == 0U) {
                 s_cam_corner_entry_tick = now;
             } else if ((uint32_t)(now - s_cam_corner_entry_tick) >=
                        CAR_CAM_CORNER_ENTER_MS) {
                 s_cam_corner_active = 1U;
+                s_cam_corner_low_seen = 0U;
                 s_cam_corner_entry_tick = 0U;
                 s_cam_corner_exit_tick = 0U;
+                s_cam_corner_low_tick = 0U;
             }
-        } else {
+        } else if (abs_curv < CAR_CAM_CORNER_ENTER_DEG) {
             s_cam_corner_entry_tick = 0U;
         }
     } else {
@@ -321,6 +346,8 @@ static void Car_CameraCornerUpdate(uint32_t now)
                        CAR_CAM_CORNER_EXIT_MS) {
                 s_cam_corner_active = 0U;
                 s_cam_corner_exit_tick = 0U;
+                s_cam_corner_low_seen = 1U;
+                s_cam_corner_low_tick = now;
                 LapTimer_OnRightAngle();
             }
         } else {

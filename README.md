@@ -148,7 +148,7 @@ openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
 
 - 波特率 **115200 8N1**
 - 帧格式：`0xA5 | ERR(float32 小端) | ANG(float32 小端) | CURV(float32 小端) | 0x5A`，共 14 字节
-- 固件使用 `ERR / 1000` 作为横向偏差；`ANG`、`CURV` 已解析保存但暂不参与转向
+- 固件使用 `ERR / 1000` 作为横向偏差；`ANG` 已解析保存，`CURV` 用于直角弯计数，二者都不参与转向
 - `ERR` 正=线在画面右侧→右转
 - 超过 `CAR_CAMERA_TIMEOUT_MS`（默认 200ms）没有有效帧就停车
 - 当前转向不再使用车头八路传感器；八路仍保留给遥测/调试
@@ -400,7 +400,7 @@ OB 3         障碍物次数
 | `CAR_LAP_COUNT` | 2 | 记录前几圈耗时，跑完立即停车 |
 | `CAR_LAP_CORNER_DEBOUNCE_MS` | 300 | 同一个弯道重复触发时的防重复计数时间 |
 | `CAR_CAM_CORNER_ENTER_DEG` | 45 | CURV 超过该角度认为进入直角弯 |
-| `CAR_CAM_CORNER_EXIT_DEG` | 15 | CURV 低于该角度认为退出直角弯 |
+| `CAR_CAM_CORNER_EXIT_DEG` | 30 | CURV 低于该角度认为退出直角弯（需高于圆弧 CURV） |
 | `CAR_CAM_CORNER_ENTER_MS` | 40 | 进入确认时间 |
 | `CAR_CAM_CORNER_EXIT_MS` | 100 | 退出确认时间 |
 | `OLED_I2C_ADDR` | 0x3C | OLED 的 7 位 I2C 地址 |
