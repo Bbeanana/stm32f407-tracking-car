@@ -240,11 +240,11 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_TURN_LIMIT_MPS` | 0.25 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.35 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
-| `CAR_RIGHT_TURNS_ONLY` | 1 | 1=只有右转弯：找线固定向右，圆弧提示只认右偏；0=左右弯都可能 |
+| `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
 | `CAR_SEARCH_SPEED_MPS` | 0.10 | 原地找线速度 |
-| `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转时的单向找线时间 |
+| `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转特化（模式 1）时的单向找线时间 |
 | `CAR_SEARCH_TIMEOUT_MS` | 3400 | 左右弯都有的双向找线总时间 |
 | `CAR_SEARCH_PHASE_MS` | 1200 | 双向模式第一段找线时间，超时后反向 |
 | `CAR_SEARCH_HINT_MS` | 800 | 双向模式丢线前方向提示的有效期 |
@@ -418,10 +418,11 @@ INIT ──1.2s──> LINE ──障碍<8cm──> STOP ──障碍移开>15cm
 - `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
   并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
   `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
-- `SEARCH`：默认 `CAR_RIGHT_TURNS_ONLY=1`，丢线后固定向右原地转，
-  `CAR_SEARCH_RIGHT_TIMEOUT_MS` 内没找到线就停车；如果以后赛道出现左弯，
-  把它改成 `0`，就会按丢线前最后偏线方向转，并在 `CAR_SEARCH_PHASE_MS`
-  后反向搜索。
+- `SEARCH`：默认 `CAR_RIGHT_TURNS_ONLY=0`，优先按丢线前最后一次有效偏线
+  方向原地转，`CAR_SEARCH_PHASE_MS` 内没找到就反向再找，总时间超过
+  `CAR_SEARCH_TIMEOUT_MS` 后停车。
+  如果确定赛道只有右转，可把 `CAR_RIGHT_TURNS_ONLY` 改成 `1`，找线会固定
+  向右并使用 `CAR_SEARCH_RIGHT_TIMEOUT_MS` 单向超时。
 - 底盘为**两个后轮差速驱动 + 前万向轮**：原地找线时绕后轴旋转，车头的
   八路传感器会扫过直角弯后的线。找线速度取 0.10m/s，避免车头扫得太快漏线。
 - 上电后从未检测到线时，`CAR_START_REQUIRE_LINE=1` 会先停车，不进入
