@@ -291,10 +291,13 @@ void Motion_Loop(float dt_s)
     s_set_l = MotionRamp(s_set_l, s_cmd_l, max_step);
     s_set_r = MotionRamp(s_set_r, s_cmd_r, max_step);
 
-    if (fabsf(s_set_l) < CAR_SPEED_DEADBAND_MPS) {
+    /* 死区只清“目标速度很小”的情况，不能清正在斜坡上升的设定值；
+     * 否则 1.0m/s² × 5ms = 0.005m/s，每一步都会被 0.010m/s 死区清回 0，
+     * 电机永远得不到输出。 */
+    if (fabsf(s_cmd_l) < CAR_SPEED_DEADBAND_MPS) {
         s_set_l = 0.0f;
     }
-    if (fabsf(s_set_r) < CAR_SPEED_DEADBAND_MPS) {
+    if (fabsf(s_cmd_r) < CAR_SPEED_DEADBAND_MPS) {
         s_set_r = 0.0f;
     }
 
