@@ -33,7 +33,7 @@
 #define CAR_LINE_BASE_SPEED_MPS          0.24f
 #define CAR_LINE_MIN_SPEED_MPS           0.084f
 #define CAR_LINE_MAX_SPEED_MPS           0.60f
-#define CAR_LINE_KP                      0.34f   /* 提高直角弯转向速度 */
+#define CAR_LINE_KP                      0.28f   /* 直角弯转向增益（降低摆动） */
 #define CAR_LINE_KD                      0.10f   /* 增加阻尼，抑制来回摆 */
 #define CAR_LINE_TURN_LIMIT_MPS          0.42f   /* 提高直角弯转向速度 */
 #define CAR_LINE_ERROR_FILTER            0.25f   /* 平滑一点，减少高频抖动 */
