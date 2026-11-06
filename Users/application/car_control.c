@@ -451,13 +451,13 @@ static void Car_LineLoop(void)
         return;
     }
 
-    /* 黑线消失：短暂确认后直接制动，不原地旋转找线 */
+    /* 黑线消失：大概率是直角弯，确认后固定向右转，不来回旋转找线 */
     if (TrackSensor_IsLost(&s_track)) {
         if (s_line_lost_tick == 0U) {
             s_line_lost_tick = now;
         } else if ((uint32_t)(now - s_line_lost_tick) >=
                    CAR_LOST_STOP_MS) {
-            Motion_Brake();
+            Car_EnterState(CAR_STATE_SEARCH);
             return;
         }
     } else {
@@ -508,14 +508,24 @@ static void Car_LineLoop(void)
 }
 
 /**
- * @brief 丢线处理：不原地旋转找线，保持制动；线重新出现后恢复循迹
+ * @brief 丢线/直角弯处理：固定向右转约 90 度，不来回旋转找线
  */
 static void Car_SearchLoop(void)
 {
-    Motion_Brake();
+    uint32_t now = HAL_GetTick();
 
     if (!TrackSensor_IsLost(&s_track)) {
         Car_EnterState(CAR_STATE_LINE);
+        return;
+    }
+
+    if ((uint32_t)(now - s_state_tick) < CAR_RIGHT_TURN_MS) {
+        /* 左轮前进、右轮后退 → 原地右转 */
+        Motion_SetWheelSpeeds(CAR_RIGHT_TURN_SPEED_MPS,
+                              -CAR_RIGHT_TURN_SPEED_MPS);
+    } else {
+        /* 转完仍没有线：停车，不再继续旋转找线 */
+        Motion_Brake();
     }
 }
 

@@ -153,9 +153,9 @@ openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
 - 超过 `CAR_CAMERA_TIMEOUT_MS`（默认 200ms）没有有效帧就停车
 - 当前转向不再使用车头八路传感器；八路仍保留给遥测/调试
 
-> **注意**：摄像头模式下，原来的 `SEARCH` 找线不再由前八路触发；
-> 圈计时改用摄像头 `CURV` 的直角弯尖峰；圆弧蜂鸣提示仍保留，
-> 使用前八路掩码 + 摄像头 ERR 做提示。
+> **注意**：摄像头模式下，前八路丢线不再触发原来的来回找线；
+> 现在按直角弯处理，固定向右转约 90°。圈计时改用摄像头 `CURV` 的直角弯尖峰；
+> 圆弧蜂鸣提示仍保留，使用摄像头 `CURV` 判断。
 
 #### 2.1 车头八路数字传感器（仅遥测）
 
@@ -267,10 +267,12 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `TRACK_LPF_ALPHA` | 0.15 | 每路 0/1 的一阶低通系数，越小越平滑但越滞后 |
-| `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
+| `CAR_RIGHT_TURNS_ONLY` | 0 | 旧版找线方向配置；当前丢线固定右转，基本不再使用 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_CAMERA_TIMEOUT_MS` | 200 | 摄像头超过该时间没有有效帧就停车 |
-| `CAR_LOST_STOP_MS` | 250 | 黑线消失后多久制动（不旋转找线） |
+| `CAR_LOST_STOP_MS` | 250 | 黑线消失后多久开始固定右转 |
+| `CAR_RIGHT_TURN_SPEED_MPS` | 0.18 | 丢线后固定右转速度 |
+| `CAR_RIGHT_TURN_MS` | 650 | 固定右转持续时间（约 90°） |
 
 控制律：
 
@@ -450,7 +452,8 @@ OB 3         障碍物次数
 ```text
 INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
-                 ├──黑线消失>250ms──> 制动（保持 LINE，不旋转找线）
+                 ├──黑线消失>250ms──> 固定右转约90° ──找到线──> LINE
+                 │                              └──转完仍无线──> 停车
                  └──编码器故障──> FAULT
 ```
 
@@ -458,9 +461,10 @@ INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15c
 - `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
   并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
   `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
-- 黑线消失：前八路持续丢线超过 `CAR_LOST_STOP_MS` 时直接制动，不再进入
-  `SEARCH` 原地旋转找线；线重新出现后继续循迹。
-- 摄像头模式下不再使用 `SEARCH` 状态；摄像头无有效帧时也会制动。
+- 黑线消失：前八路持续丢线超过 `CAR_LOST_STOP_MS` 后按直角弯处理，
+  固定向右转约 90°（`CAR_RIGHT_TURN_MS`）；转到线重新出现就恢复循迹，
+  转完仍没有线则停车，不再来回旋转找线。
+- 摄像头无有效帧时直接制动，不进入右转恢复。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -519,7 +523,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.0
 | 现象 | 排查 |
 |---|---|
 | 上电不跑 | 看串口是否停在 `INIT`；检查 `CAR_START_DELAY_MS`、电机 STBY |
-| 黑线消失后不停车 | 检查前八路 `M=` 是否一直为非零；确认 `CAR_LOST_STOP_MS` 和 `TRACK_ACTIVE_LEVEL` |
+| 黑线消失后不右转 | 检查前八路是否真的全丢线（`M=0`），确认 `TRACK_ACTIVE_LEVEL`、`CAR_LOST_STOP_MS` 和右转参数 |
 | 一给速度就报 `F=1` | 编码器方向反了，改 `CAR_ENCODER_*_INVERT` 或对调 A/B |
 | 一给速度就报 `F=2` | 编码器没信号/没接，检查 VCC/GND/A/B |
 | 车直线画龙 | 降低 `CAR_LINE_KP`，适当加 `CAR_LINE_KD`，或减小 `CAR_LINE_ERROR_FILTER` |

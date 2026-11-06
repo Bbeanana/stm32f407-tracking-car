@@ -50,7 +50,9 @@
 
 /* 丢线/直角弯找线：短暂保持上一次偏差，超过时间则原地找线。
  * 底盘是后轮差速 + 前万向轮，原地转向时绕后轴旋转，车头传感器扫过弯后的线。 */
-#define CAR_LOST_STOP_MS                 250U   /* 黑线消失后制动确认时间，不原地找线 */
+#define CAR_LOST_STOP_MS                 250U   /* 黑线消失确认时间，随后按直角弯右转 */
+#define CAR_RIGHT_TURN_SPEED_MPS         0.18f  /* 丢线后固定右转速度 */
+#define CAR_RIGHT_TURN_MS                650U   /* 固定右转持续时间，约 90 度 */
 #define CAR_SEARCH_SPEED_MPS             0.204f
 #define CAR_SEARCH_TIMEOUT_MS            3400U   /* 左右弯都有的双向找线时间 */
 #define CAR_SEARCH_RIGHT_TIMEOUT_MS      2200U   /* 只有右转时单向找线时间 */
