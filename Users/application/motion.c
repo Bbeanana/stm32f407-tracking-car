@@ -307,6 +307,9 @@ void Motion_Loop(float dt_s)
             MotionResetPid(&s_pid_l);
         } else {
             float out_l = PID_Calculate(&s_pid_l, s_set_l, fb_l);
+            out_l += (s_set_l / CAR_MAX_WHEEL_SPEED_MPS) * CAR_SPEED_FF_GAIN;
+            out_l = MotionClamp(out_l, -CAR_SPEED_PID_MAX_OUT,
+                                CAR_SPEED_PID_MAX_OUT);
             BldcMotor_SetOutput(&s_motor_l, out_l);
         }
 
@@ -315,6 +318,9 @@ void Motion_Loop(float dt_s)
             MotionResetPid(&s_pid_r);
         } else {
             float out_r = PID_Calculate(&s_pid_r, s_set_r, fb_r);
+            out_r += (s_set_r / CAR_MAX_WHEEL_SPEED_MPS) * CAR_SPEED_FF_GAIN;
+            out_r = MotionClamp(out_r, -CAR_SPEED_PID_MAX_OUT,
+                                CAR_SPEED_PID_MAX_OUT);
             BldcMotor_SetOutput(&s_motor_r, out_r);
         }
 

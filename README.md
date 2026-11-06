@@ -383,6 +383,7 @@ OB 3         障碍物次数
 | `CAR_SPEED_PID_KP` | 0.90 | 速度环 Kp（降低以减小超调） |
 | `CAR_SPEED_PID_KI` | 0.25 | 速度环 Ki（降低以抑制积分饱和） |
 | `CAR_SPEED_PID_MAX_INTEGRAL` | 0.40 | 积分限幅 |
+| `CAR_SPEED_FF_GAIN` | 0.80 | 速度前馈，补偿低速死区/起步占空比 |
 | `CAR_SPEED_RAMP_MPS2` | 1.00 | 加减速斜坡，防止起步猛冲 |
 | `CAR_MAX_WHEEL_SPEED_MPS` | 0.55 | 单轮最大速度 |
 | `CAR_ENCODER_CPR` | 1560 | 输出轴一圈计数（必须标定） |

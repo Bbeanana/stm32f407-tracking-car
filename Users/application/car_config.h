@@ -128,6 +128,10 @@
 #define CAR_SPEED_PID_MAX_OUT            1.00f
 #define CAR_SPEED_PID_MAX_INTEGRAL       0.40f   /* 原 0.70，积分限幅收紧 */
 
+/* 速度前馈：补偿电机/驱动死区。低速时只靠 PID 可能起不来，
+ * 前馈按目标速度直接给一个基础占空比，PID 只做小幅修正。 */
+#define CAR_SPEED_FF_GAIN                0.80f
+
 /* 驱动板 PWM 占空比范围 */
 #define CAR_MOTOR_MIN_DUTY               0.05f
 #define CAR_MOTOR_MAX_DUTY               0.95f
