@@ -68,18 +68,18 @@
 #define BUZZER_PIN               GPIO_PIN_0
 #define BUZZER_ACTIVE_LEVEL      0U
 
-/* --------------------------- MAX7219 8x8 点阵 ---------------------------- */
-/* 单个 8x8 模块，软件模拟 SPI。PB10/PB12/PB13 当前工程未占用。 */
-#define MAX7219_DIN_PORT         GPIOB
-#define MAX7219_DIN_PIN          GPIO_PIN_10
-#define MAX7219_CS_PORT          GPIOB
-#define MAX7219_CS_PIN           GPIO_PIN_12
-#define MAX7219_CLK_PORT         GPIOB
-#define MAX7219_CLK_PIN          GPIO_PIN_13
-#define MAX7219_INTENSITY        6U              /* 0~15 */
-/* 如果显示上下/左右反了，改这两个开关，不用拆模块 */
-#define MAX7219_FLIP_X           0U
-#define MAX7219_FLIP_Y           0U
+/* --------------------------- 128x64 I2C OLED ---------------------------- */
+/* 软件 I2C，SSD1306，PB10=SCL，PB11=SDA。模块一般自带 4.7k 上拉。 */
+#define OLED_SCL_PORT            GPIOB
+#define OLED_SCL_PIN             GPIO_PIN_10
+#define OLED_SDA_PORT            GPIOB
+#define OLED_SDA_PIN             GPIO_PIN_11
+#define OLED_I2C_ADDR            0x3CU            /* 常见 0x3C，部分模块 0x3D */
+/* 1=SH1106（1.3 寸模块常见）；0=SSD1306 */
+#define OLED_SH1106              0U
+/* 如果显示上下/左右反了，改这两个开关 */
+#define OLED_FLIP_X              0U
+#define OLED_FLIP_Y              0U
 
 /* ------------------------------- 调试串口 ------------------------------- */
 #define DEBUG_UART_HANDLE        (&huart2)
