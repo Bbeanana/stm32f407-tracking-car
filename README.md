@@ -147,8 +147,8 @@ openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
 ```
 
 - 波特率 **115200 8N1**
-- 帧格式：`0xA5 | ERR(float32 小端) | ANG(float32 小端) | 0x5A`，共 10 字节
-- 固件只使用 `ERR / 1000` 作为横向偏差，`ANG` 仅解析保存
+- 帧格式：`0xA5 | ERR(float32 小端) | ANG(float32 小端) | CURV(float32 小端) | 0x5A`，共 14 字节
+- 固件使用 `ERR / 1000` 作为横向偏差；`ANG`、`CURV` 已解析保存但暂不参与转向
 - `ERR` 正=线在画面右侧→右转
 - 超过 `CAR_CAMERA_TIMEOUT_MS`（默认 200ms）没有有效帧就停车
 - 当前转向不再使用车头八路传感器；八路仍保留给遥测/调试

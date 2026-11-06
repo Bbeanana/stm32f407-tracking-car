@@ -6,7 +6,7 @@
 #include "car_config.h"
 #include "main.h"
 
-#define CAMERA_FRAME_LEN     10U
+#define CAMERA_FRAME_LEN     14U
 #define CAMERA_RX_SIZE       64U
 #define CAMERA_RX_MASK       (CAMERA_RX_SIZE - 1U)
 
@@ -22,7 +22,8 @@ static uint8_t s_packet_index;
 static uint8_t s_in_frame;
 
 static float s_error;
-static float s_angle;
+static float s_angle_deg;
+static float s_curvature_deg;
 static uint8_t s_valid;
 static uint32_t s_last_packet_tick;
 
@@ -70,7 +71,8 @@ void Camera_Init(void)
     s_packet_index = 0U;
     s_in_frame = 0U;
     s_error = 0.0f;
-    s_angle = 0.0f;
+    s_angle_deg = 0.0f;
+    s_curvature_deg = 0.0f;
     s_valid = 0U;
     s_last_packet_tick = HAL_GetTick();
 
@@ -102,20 +104,23 @@ static void Camera_ParseFrame(void)
 {
     float err;
     float ang;
+    float curv;
 
-    if (s_packet[9] != 0x5AU) {
+    if (s_packet[13] != 0x5AU) {
         return;
     }
 
     memcpy(&err, &s_packet[1], sizeof(float));
     memcpy(&ang, &s_packet[5], sizeof(float));
+    memcpy(&curv, &s_packet[9], sizeof(float));
 
-    if (err != err || ang != ang) {   /* NaN */
+    if (err != err || ang != ang || curv != curv) {   /* NaN */
         return;
     }
 
     s_error = Camera_Clamp(err / 1000.0f, -1.0f, 1.0f);
-    s_angle = Camera_Clamp(ang / 900.0f, -1.0f, 1.0f);
+    s_angle_deg = ang;
+    s_curvature_deg = curv;
     s_last_packet_tick = HAL_GetTick();
     s_valid = 1U;
 }
@@ -179,9 +184,14 @@ float Camera_GetError(void)
     return s_error;
 }
 
-float Camera_GetAngle(void)
+float Camera_GetAngleDeg(void)
 {
-    return s_angle;
+    return s_angle_deg;
+}
+
+float Camera_GetCurvatureDeg(void)
+{
+    return s_curvature_deg;
 }
 
 uint32_t Camera_GetLastPacketTick(void)
