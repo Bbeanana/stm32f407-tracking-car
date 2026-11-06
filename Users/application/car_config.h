@@ -27,13 +27,14 @@
 /* 1=通道顺序与车头左右相反（例如模块装反了） */
 #define TRACK_REVERSE_ORDER              0
 
-#define CAR_LINE_BASE_SPEED_MPS          0.15f
+#define CAR_LINE_BASE_SPEED_MPS          0.12f
 #define CAR_LINE_MIN_SPEED_MPS           0.04f
-#define CAR_LINE_MAX_SPEED_MPS           0.34f
-#define CAR_LINE_KP                      0.22f   /* 降低转向比例，抑制直线摆动 */
-#define CAR_LINE_KD                      0.10f   /* 增加微分阻尼 */
-#define CAR_LINE_TURN_LIMIT_MPS          0.14f   /* 收紧差速转向限幅 */
-#define CAR_LINE_ERROR_FILTER            0.25f   /* 0~1，越小越平滑 */
+#define CAR_LINE_MAX_SPEED_MPS           0.30f
+#define CAR_LINE_KP                      0.18f   /* 降低转向比例，抑制直线摆动 */
+#define CAR_LINE_KD                      0.12f   /* 增加微分阻尼 */
+#define CAR_LINE_TURN_LIMIT_MPS          0.12f   /* 收紧差速转向限幅 */
+#define CAR_LINE_ERROR_FILTER            0.20f   /* 0~1，越小越平滑 */
+#define CAR_LINE_ERROR_DEADBAND          0.15f   /* 中心附近不做转向，抑制数字量抖动 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
 /* 0=通用左右找线（按最后偏线方向，超时反向）；

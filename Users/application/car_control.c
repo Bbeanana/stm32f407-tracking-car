@@ -205,6 +205,11 @@ static void Car_EnterState(CarState_t state)
     if (state == CAR_STATE_LINE) {
         s_error_filtered = TrackSensor_GetError(&s_track);
         s_last_error = s_error_filtered;
+
+        /* 进入循迹时按中心死区处理，避免第一拍微分项产生踢动 */
+        if (fabsf(s_last_error) < CAR_LINE_ERROR_DEADBAND) {
+            s_last_error = 0.0f;
+        }
     }
 
     if (state == CAR_STATE_STOP) {
@@ -339,8 +344,13 @@ static void Car_LineLoop(void)
     s_error_filtered +=
         CAR_LINE_ERROR_FILTER * (error - s_error_filtered);
 
-    float delta = s_error_filtered - s_last_error;
-    float turn = CAR_LINE_KP * s_error_filtered + CAR_LINE_KD * delta;
+    float control_error = s_error_filtered;
+    if (fabsf(control_error) < CAR_LINE_ERROR_DEADBAND) {
+        control_error = 0.0f;   /* 线在中心附近时不做转向，避免数字量抖动 */
+    }
+
+    float delta = control_error - s_last_error;
+    float turn = CAR_LINE_KP * control_error + CAR_LINE_KD * delta;
 
     turn = CarClamp(turn, -CAR_LINE_TURN_LIMIT_MPS, CAR_LINE_TURN_LIMIT_MPS);
 
@@ -357,7 +367,7 @@ static void Car_LineLoop(void)
     right = CarClamp(right, -CAR_LINE_MAX_SPEED_MPS, CAR_LINE_MAX_SPEED_MPS);
 
     Motion_SetWheelSpeeds(left, right);
-    s_last_error = s_error_filtered;
+    s_last_error = control_error;
 }
 
 /**
