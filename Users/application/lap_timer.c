@@ -1,8 +1,11 @@
 #include "lap_timer.h"
 
+#include <math.h>
+
 #include "main.h"
 #include "car_config.h"
 #include "car_control.h"
+#include "motion.h"
 
 static CarState_t s_prev_state;
 
@@ -16,6 +19,7 @@ static uint8_t s_corner_seen;
 static uint32_t s_last_corner_ms;
 static uint8_t s_running;
 static uint8_t s_started;
+static uint32_t s_launch_tick;
 
 static uint32_t s_obstacle_count;
 
@@ -30,6 +34,7 @@ void LapTimer_Init(void)
     s_last_corner_ms = 0U;
     s_running = 0U;
     s_started = 0U;
+    s_launch_tick = 0U;
     s_obstacle_count = 0U;
 
     for (uint8_t i = 0U; i < CAR_LAP_COUNT; i++) {
@@ -42,15 +47,25 @@ void LapTimer_Update(void)
 {
     CarState_t state = Car_GetState();
 
-    /* 上电后第一次进入 LINE 状态视为发车，开始第一圈计时 */
-    if (state == CAR_STATE_LINE && s_prev_state == CAR_STATE_INIT) {
-        if (!s_started) {
-            s_started = 1U;
-            s_running = 1U;
-            s_lap_index = 0U;
-            s_corner_count = 0U;
-            s_corner_seen = 0U;
-            s_lap_start_ms = HAL_GetTick();
+    /* 上电后第一次真正转动车轮时开始第一圈计时。
+     * 进入 LINE 只代表使能电机，摄像头无效、障碍物停车或加速前都不算。 */
+    if (state == CAR_STATE_LINE && !s_started) {
+        if (fabsf(Motion_GetSpeedL()) >= CAR_LAP_START_SPEED_MPS &&
+            fabsf(Motion_GetSpeedR()) >= CAR_LAP_START_SPEED_MPS) {
+            if (s_launch_tick == 0U) {
+                s_launch_tick = HAL_GetTick();
+            } else if ((uint32_t)(HAL_GetTick() - s_launch_tick) >=
+                       CAR_LAP_START_HOLD_MS) {
+                s_started = 1U;
+                s_running = 1U;
+                s_lap_index = 0U;
+                s_corner_count = 0U;
+                s_corner_seen = 0U;
+                s_lap_start_ms = s_launch_tick;
+                s_launch_tick = 0U;
+            }
+        } else {
+            s_launch_tick = 0U;
         }
     }
 

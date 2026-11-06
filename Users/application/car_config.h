@@ -66,12 +66,24 @@
 #define CAR_LAP_COUNT                    2U
 #define CAR_LAP_CORNER_DEBOUNCE_MS       300U  /* 同一个弯道重复触发时防重复计数 */
 
+/* 第一圈从车轮真正转动开始计时，而不是从进入 LINE 状态开始 */
+#define CAR_LAP_START_SPEED_MPS          0.020f
+#define CAR_LAP_START_HOLD_MS            30U
+
 /* 摄像头 CURV 直角弯检测：圆弧约 0~30°，直角弯通常 >45°。
  * 退出阈值要高于圆弧的 CURV，否则跑完直角弯后进圆弧时无法复位。 */
 #define CAR_CAM_CORNER_ENTER_DEG         45.0f
 #define CAR_CAM_CORNER_EXIT_DEG          30.0f
 #define CAR_CAM_CORNER_ENTER_MS          40U
 #define CAR_CAM_CORNER_EXIT_MS           100U
+
+/* 摄像头 CURV 圆弧检测：直道约 0°，圆弧约 8~35°，直角弯 >45°。
+ * 只用于圆弧进出蜂鸣，不参与转向。 */
+#define CAR_CAM_ARC_ENTER_DEG            8.0f
+#define CAR_CAM_ARC_EXIT_DEG             4.0f
+#define CAR_CAM_ARC_MAX_DEG              40.0f  /* 超过该值按直角弯处理，不蜂鸣 */
+#define CAR_CAM_ARC_ENTER_MS             100U
+#define CAR_CAM_ARC_EXIT_MS              120U
 
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */
@@ -91,20 +103,10 @@
  * 串口 U=0 可用于观察本次读数是否有效。 */
 
 /* -------------------- 圆弧弯道蜂鸣提示（不含直角弯） -------------------- */
-/* 判断依据：偏差持续超过阈值 + 压线通道数较少 + 偏差变化不剧烈。
- * 直角弯道通常表现为多路压线、丢线或偏差突变，会抑制提示。 */
+/* 判断依据：摄像头 CURV 的圆弧区间；直角弯的大曲率尖峰会复位并静默。 */
 #define CAR_ARC_BEEP_ENABLE              1
 #define CAR_ARC_BEEP_MS                  80U    /* 进入/退出各短响一声 */
-
-#define CAR_ARC_ENTER_ABS_ERROR          0.25f  /* |E| 超过该值认为进入圆弧候选 */
-#define CAR_ARC_EXIT_ABS_ERROR           0.18f  /* |E| 低于该值认为退出圆弧候选 */
-#define CAR_ARC_MAX_ABS_ERROR            0.78f  /* 更大偏差按直角/贴边处理 */
-#define CAR_ARC_MAX_SENSORS              3U     /* 同时压线超过该路数按直角处理 */
-
-#define CAR_ARC_ENTER_DEBOUNCE_MS        180U   /* 持续这么久才确认进入 */
-#define CAR_ARC_EXIT_DEBOUNCE_MS         150U   /* 持续这么久才确认退出 */
-#define CAR_ARC_SHARP_DELTA              0.35f  /* 偏差慢滤波差值超过该值视为突变 */
-#define CAR_ARC_SUPPRESS_MS              400U   /* 直角/丢线后抑制提示的时间 */
+#define CAR_ARC_SUPPRESS_MS              400U   /* 直角/状态切换后抑制提示的时间 */
 
 /* --------------------------- 电机与编码器 ----------------------------- */
 /* 1=速度闭环（使用编码器）；0=开环占空比 */

@@ -333,41 +333,38 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 
 ### 圆弧弯道蜂鸣提示
 
-只对**圆弧弯道**提示，直角弯道、十字、丢线不提示。进入圆弧和退出圆弧各短响一声（默认 80ms）；如果一圈只有一个圆弧，一圈共 2 声。
+只对**圆弧弯道**提示，直角弯道不提示。进入圆弧和退出圆弧各短响一声（默认 80ms）；如果一圈只有一个圆弧，一圈共 2 声。
 
-判断逻辑在 `car_control.c`：
+判断逻辑在 `car_control.c`，使用摄像头的 `CURV`：
 
-- `|E|` 持续大于 `CAR_ARC_ENTER_ABS_ERROR`（默认 0.25）达到
-  `CAR_ARC_ENTER_DEBOUNCE_MS`（默认 180ms）→ 进入圆弧，响一声
-- `|E|` 持续小于 `CAR_ARC_EXIT_ABS_ERROR`（默认 0.18）达到
-  `CAR_ARC_EXIT_DEBOUNCE_MS`（默认 150ms）→ 退出圆弧，响一声
-- 同时压线通道数超过 `CAR_ARC_MAX_SENSORS`、`|E|` 超过
-  `CAR_ARC_MAX_ABS_ERROR`、偏差突变、丢线或全压线 → 按直角/异常处理，
-  复位状态并静默 `CAR_ARC_SUPPRESS_MS`
+- `|CURV|` 持续大于 `CAR_CAM_ARC_ENTER_DEG` 达到
+  `CAR_CAM_ARC_ENTER_MS` → 进入圆弧，响一声
+- `|CURV|` 持续小于 `CAR_CAM_ARC_EXIT_DEG` 达到
+  `CAR_CAM_ARC_EXIT_MS` → 退出圆弧，响一声
+- `|CURV|` 大于 `CAR_CAM_ARC_MAX_DEG` → 按直角弯处理，复位并静默
+  `CAR_ARC_SUPPRESS_MS`，不产生圆弧提示
 - 每次状态切换后会静默 `CAR_ARC_SUPPRESS_MS`，避免起步和找线时误响
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
 | `CAR_ARC_BEEP_ENABLE` | 1 | 0=关闭圆弧提示 |
 | `CAR_ARC_BEEP_MS` | 80 | 每次提示鸣叫时间 |
-| `CAR_ARC_ENTER_ABS_ERROR` | 0.25 | 进入圆弧的偏差阈值 |
-| `CAR_ARC_EXIT_ABS_ERROR` | 0.18 | 退出圆弧的偏差阈值 |
-| `CAR_ARC_MAX_ABS_ERROR` | 0.78 | 超过该偏差按直角/贴边处理 |
-| `CAR_ARC_MAX_SENSORS` | 3 | 同时压线超过该路数按直角处理 |
-| `CAR_ARC_ENTER_DEBOUNCE_MS` | 180 | 进入圆弧确认时间 |
-| `CAR_ARC_EXIT_DEBOUNCE_MS` | 150 | 退出圆弧确认时间 |
-| `CAR_ARC_SHARP_DELTA` | 0.35 | 偏差突变判定阈值 |
-| `CAR_ARC_SUPPRESS_MS` | 400 | 直角/丢线/状态切换后的静默时间 |
+| `CAR_CAM_ARC_ENTER_DEG` | 8 | 进入圆弧的 CURV 阈值 |
+| `CAR_CAM_ARC_EXIT_DEG` | 4 | 退出圆弧的 CURV 阈值 |
+| `CAR_CAM_ARC_MAX_DEG` | 40 | 超过该值按直角弯处理 |
+| `CAR_CAM_ARC_ENTER_MS` | 100 | 进入圆弧确认时间 |
+| `CAR_CAM_ARC_EXIT_MS` | 120 | 退出圆弧确认时间 |
+| `CAR_ARC_SUPPRESS_MS` | 400 | 直角/状态切换后的静默时间 |
 
-> 8 路数字循迹只能根据偏差和压线组合做近似判断，圆弧和直角不可能 100% 区分。
-> 先看串口遥测的 `E=` 和 `M=`：如果直角弯误响，减小 `CAR_ARC_MAX_SENSORS`
-> 或增大 `CAR_ARC_SHARP_DELTA`；如果圆弧漏响，降低 `CAR_ARC_ENTER_ABS_ERROR`
-> 或减小 `CAR_ARC_ENTER_DEBOUNCE_MS`。
+> 如果圆弧提示偏早/偏晚，先看调试遥测里的 `CURV` 峰值，再调
+> `CAR_CAM_ARC_ENTER_DEG` / `CAR_CAM_ARC_EXIT_DEG` 和确认时间。
+> 如果圆弧被误判成直角弯，降低 `CAR_CAM_ARC_MAX_DEG` 或提高
+> `CAR_CAM_CORNER_ENTER_DEG`。
 
 ### 圈计时与 128x64 OLED
 
-起点在第二个右直角弯末端。**上电前先把车放在起点**，上电后第一次进入
-`LINE` 状态开始计时；摄像头 `CURV` 出现直角弯尖峰时累计弯道，
+起点在第二个右直角弯末端。**上电前先把车放在起点**，上电后车轮真正
+开始转动时开始第一圈计时；摄像头 `CURV` 出现直角弯尖峰时累计弯道，
 每完成 `CAR_LAP_CORNERS`（默认 2）个右直角弯算一圈，记录前
 `CAR_LAP_COUNT`（默认 2）圈。第二圈完成会立即刹车并锁存停车。
 
@@ -399,6 +396,8 @@ OB 3         障碍物次数
 | `CAR_LAP_CORNERS` | 2 | 每圈经过的右直角弯数量 |
 | `CAR_LAP_COUNT` | 2 | 记录前几圈耗时，跑完立即停车 |
 | `CAR_LAP_CORNER_DEBOUNCE_MS` | 300 | 同一个弯道重复触发时的防重复计数时间 |
+| `CAR_LAP_START_SPEED_MPS` | 0.020 | 第一圈起计的实际轮速阈值 |
+| `CAR_LAP_START_HOLD_MS` | 30 | 轮速超过阈值后的确认时间 |
 | `CAR_CAM_CORNER_ENTER_DEG` | 45 | CURV 超过该角度认为进入直角弯 |
 | `CAR_CAM_CORNER_EXIT_DEG` | 30 | CURV 低于该角度认为退出直角弯（需高于圆弧 CURV） |
 | `CAR_CAM_CORNER_ENTER_MS` | 40 | 进入确认时间 |
@@ -495,7 +494,7 @@ OB=0
 需要调试遥测时，把 `CAR_LAP_SCREEN_ENABLE` 改成 `0`，恢复原来的单行调试输出：
 
 ```text
-S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1=12.34 L2=--.-- LAP=3.45 N=2 OB=0
+S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1=12.34 L2=--.-- LAP=3.45 N=2 OB=0
 ```
 
 | 字段 | 含义 |
@@ -505,6 +504,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1
 | `U` | 超声波本次读数是否有效（1=有效） |
 | `M` | 八路循迹掩码（十六进制，bit0=PD2 最左） |
 | `E` | 循迹偏差（-1~+1） |
+| `K` | 摄像头 CURV，单位度（圆弧约 8~35，直角弯 >45） |
 | `T` | 左右轮目标速度（m/s） |
 | `V` | 左右轮实际速度（m/s） |
 | `C` | 左右编码器累计计数 |

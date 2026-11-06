@@ -5,6 +5,7 @@
 #include "main.h"
 #include "car_config.h"
 #include "car_control.h"
+#include "camera.h"
 #include "lap_timer.h"
 #include "motion.h"
 #include "current_sense.h"
@@ -60,7 +61,7 @@ static void Telemetry_PrintCalibration(void)
  * @brief 周期打印 CSV 遥测（默认 200ms；校准模式 100ms）
  *
  * 输出示例：
- *   S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1=12.34 L2=--.-- LAP=3.45 N=2 OB=0
+ *   S=LINE D=25.3 U=1 M=18 E=+0.12 K=+26.2 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0 L1=12.34 L2=--.-- LAP=3.45 N=2 OB=0
  */
 static void Telemetry_FormatLap(char *out, uint8_t out_size, uint8_t index)
 {
@@ -132,12 +133,13 @@ void Telemetry_Update(void)
     Telemetry_FormatLap(lap2, sizeof(lap2), 1U);
     Telemetry_FormatCurrentLap(current_lap, sizeof(current_lap));
 
-    printf("S=%s D=%.1f U=%u M=%02X E=%+.2f T=%.2f/%.2f V=%.2f/%.2f C=%ld/%ld A=%.2f F=%u L1=%s L2=%s LAP=%s N=%u OB=%lu\r\n",
+    printf("S=%s D=%.1f U=%u M=%02X E=%+.2f K=%+.1f T=%.2f/%.2f V=%.2f/%.2f C=%ld/%ld A=%.2f F=%u L1=%s L2=%s LAP=%s N=%u OB=%lu\r\n",
            Car_GetStateName(),
            (double)Car_GetDistanceCm(),
            Car_GetUltrasonicValid(),
            Car_GetTrackMask(),
            (double)Car_GetTrackError(),
+           (double)Camera_GetCurvatureDeg(),
            (double)Motion_GetTargetL(),
            (double)Motion_GetTargetR(),
            (double)Motion_GetSpeedL(),

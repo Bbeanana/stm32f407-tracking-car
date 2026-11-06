@@ -47,27 +47,12 @@ static uint8_t s_search_phase;
 static uint32_t s_search_phase_tick;
 #endif
 
-/* 圆弧弯道提示状态 */
+/* 圆弧弯道提示状态（摄像头 CURV） */
 static uint8_t s_arc_active;
-static uint8_t s_arc_candidate;
-static int8_t s_arc_candidate_sign;
 static uint32_t s_arc_candidate_tick;
 static uint32_t s_arc_exit_tick;
 static uint8_t s_arc_suppressed;
 static uint32_t s_arc_resume_tick;
-static float s_arc_error_slow;
-
-static uint8_t Car_CountMaskBits(uint8_t mask)
-{
-    uint8_t count = 0U;
-
-    while (mask != 0U) {
-        count += (uint8_t)(mask & 1U);
-        mask >>= 1U;
-    }
-
-    return count;
-}
 
 /**
  * @brief 复位圆弧检测；suppress=1 时在 CAR_ARC_SUPPRESS_MS 内不提示
@@ -75,11 +60,8 @@ static uint8_t Car_CountMaskBits(uint8_t mask)
 static void Car_ArcReset(uint8_t suppress, uint32_t now)
 {
     s_arc_active = 0U;
-    s_arc_candidate = 0U;
-    s_arc_candidate_sign = 0;
     s_arc_candidate_tick = 0U;
     s_arc_exit_tick = 0U;
-    s_arc_error_slow = TrackSensor_GetError(&s_track);
 
     if (suppress) {
         s_arc_suppressed = 1U;
@@ -91,36 +73,26 @@ static void Car_ArcReset(uint8_t suppress, uint32_t now)
 }
 
 /**
- * @brief 圆弧弯道进出检测
+ * @brief 圆弧弯道进出检测（摄像头 CURV）
  *
- * 只对“偏差持续较大、压线通道数较少、偏差变化不剧烈”的情况提示；
- * 直角弯道常见的多路压线、丢线、偏差突变都会触发复位/抑制。
+ * 直道 CURV 接近 0，圆弧一般在 8~35°，直角弯会出现 >45° 的尖峰。
+ * 超过 MAX 时按直角弯处理并静默，不产生圆弧蜂鸣。
  */
-static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
-                          uint8_t all_active)
+static void Car_ArcUpdate(uint32_t now)
 {
 #if CAR_ARC_BEEP_ENABLE
-    uint8_t count = Car_CountMaskBits(TrackSensor_GetMask(&s_track));
-    float abs_error = fabsf(error);
-    float error_delta = fabsf(error - s_arc_error_slow);
-    uint8_t sharp = 0U;
+    float abs_curv;
 
-#if CAR_RIGHT_TURNS_ONLY
-    /* 只有右转弯：只把正偏差（线在右侧）当作圆弧候选 */
-    float curve_error = error;
-#else
-    float curve_error = abs_error;
-#endif
-
-    s_arc_error_slow += 0.05f * (error - s_arc_error_slow);
-
-    if (lost || all_active || count > CAR_ARC_MAX_SENSORS ||
-        abs_error > CAR_ARC_MAX_ABS_ERROR ||
-        error_delta > CAR_ARC_SHARP_DELTA) {
-        sharp = 1U;
+    /* 第一圈真正开始移动前、完赛后都不做圆弧提示。
+     * 状态切换时已经复位过，这里只返回，避免反复延长静默时间。 */
+    if (!LapTimer_IsRunning()) {
+        return;
     }
 
-    if (sharp) {
+    abs_curv = fabsf(Camera_GetCurvatureDeg());
+
+    /* 直角弯/异常大曲率：复位圆弧状态，避免把直角弯当圆弧 */
+    if (abs_curv > CAR_CAM_ARC_MAX_DEG) {
         Car_ArcReset(1U, now);
         return;
     }
@@ -133,30 +105,25 @@ static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
     }
 
     if (!s_arc_active) {
-        if (curve_error >= CAR_ARC_ENTER_ABS_ERROR &&
-            abs_error <= CAR_ARC_MAX_ABS_ERROR) {
-            int8_t sign = (error >= 0.0f) ? 1 : -1;
-
-            if (!s_arc_candidate || sign != s_arc_candidate_sign) {
-                s_arc_candidate = 1U;
-                s_arc_candidate_sign = sign;
+        if (abs_curv >= CAR_CAM_ARC_ENTER_DEG) {
+            if (s_arc_candidate_tick == 0U) {
                 s_arc_candidate_tick = now;
             } else if ((uint32_t)(now - s_arc_candidate_tick) >=
-                       CAR_ARC_ENTER_DEBOUNCE_MS) {
-                s_arc_candidate = 0U;
+                       CAR_CAM_ARC_ENTER_MS) {
+                s_arc_candidate_tick = 0U;
                 s_arc_active = 1U;
                 s_arc_exit_tick = 0U;
                 Buzzer_Beep(CAR_ARC_BEEP_MS);
             }
         } else {
-            s_arc_candidate = 0U;
+            s_arc_candidate_tick = 0U;
         }
     } else {
-        if (curve_error <= CAR_ARC_EXIT_ABS_ERROR) {
+        if (abs_curv <= CAR_CAM_ARC_EXIT_DEG) {
             if (s_arc_exit_tick == 0U) {
                 s_arc_exit_tick = now;
             } else if ((uint32_t)(now - s_arc_exit_tick) >=
-                       CAR_ARC_EXIT_DEBOUNCE_MS) {
+                       CAR_CAM_ARC_EXIT_MS) {
                 s_arc_active = 0U;
                 s_arc_exit_tick = 0U;
                 Buzzer_Beep(CAR_ARC_BEEP_MS);
@@ -167,9 +134,6 @@ static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
     }
 #else
     (void)now;
-    (void)error;
-    (void)lost;
-    (void)all_active;
 #endif
 }
 
@@ -388,11 +352,8 @@ static void Car_LineLoop(void)
     s_line_ever_seen = 1U;
     float error = Camera_GetError();
 
-    /* 转向只用摄像头；前八路只保留圆弧进出蜂鸣判断，不参与转向 */
-    Car_ArcUpdate(now,
-                  TrackSensor_GetError(&s_track),
-                  TrackSensor_IsLost(&s_track),
-                  TrackSensor_IsAllActive(&s_track));
+    /* 转向只用摄像头 ERR；圆弧进出蜂鸣用摄像头 CURV，不参与转向 */
+    Car_ArcUpdate(now);
 
     /* 摄像头 CURV 直角弯计数；第二圈完成立即停车 */
     Car_CameraCornerUpdate(now);
