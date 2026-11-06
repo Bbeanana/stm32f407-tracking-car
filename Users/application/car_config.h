@@ -83,8 +83,10 @@
 #define CAR_CAM_ARC_EXIT_DEG             4.0f
 #define CAR_CAM_ARC_MAX_DEG              40.0f  /* 超过该值按直角弯处理，不蜂鸣 */
 #define CAR_CAM_ARC_ENTER_MS             100U
-#define CAR_CAM_ARC_EXIT_MS              150U
+#define CAR_CAM_ARC_EXIT_MS              200U   /* 连续低值确认时间 */
 #define CAR_CAM_ARC_MIN_MS               400U   /* 入弯后至少这么久才允许出弯 */
+#define CAR_CAM_ARC_CURV_FILTER_N        20U    /* CURV 历史移动平均窗口，约 100ms */
+#define CAR_CAM_ARC_EXIT_RATIO           0.40f  /* 出弯阈值至少为入弯峰值的 40% */
 
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */

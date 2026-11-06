@@ -339,8 +339,10 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 
 - `|CURV|` 持续大于 `CAR_CAM_ARC_ENTER_DEG` 达到
   `CAR_CAM_ARC_ENTER_MS` → 进入圆弧，响一声
-- `|CURV|` 持续小于 `CAR_CAM_ARC_EXIT_DEG` 达到
+- `CURV` 经过历史移动平均后，持续小于出弯阈值达到
   `CAR_CAM_ARC_EXIT_MS` → 退出圆弧，响一声
+- 出弯阈值至少取 `CAR_CAM_ARC_EXIT_DEG` 与入弯峰值的
+  `CAR_CAM_ARC_EXIT_RATIO` 两者中的较大值，避免出弯时曲率没有完全归零而漏响
 - `|CURV|` 大于 `CAR_CAM_ARC_MAX_DEG` → 按直角弯处理，复位并静默
   `CAR_ARC_SUPPRESS_MS`，不产生圆弧提示
 - 每一圈只允许一段圆弧提示：入弯一声、出弯一声；圆弧中间 `CURV` 抖动
@@ -355,8 +357,10 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 | `CAR_CAM_ARC_EXIT_DEG` | 4 | 退出圆弧的 CURV 阈值 |
 | `CAR_CAM_ARC_MAX_DEG` | 40 | 超过该值按直角弯处理 |
 | `CAR_CAM_ARC_ENTER_MS` | 100 | 进入圆弧确认时间 |
-| `CAR_CAM_ARC_EXIT_MS` | 150 | 退出圆弧确认时间 |
+| `CAR_CAM_ARC_EXIT_MS` | 200 | 退出圆弧确认时间 |
 | `CAR_CAM_ARC_MIN_MS` | 400 | 入弯后至少这么久才允许出弯 |
+| `CAR_CAM_ARC_CURV_FILTER_N` | 20 | CURV 历史移动平均窗口（约 100ms） |
+| `CAR_CAM_ARC_EXIT_RATIO` | 0.40 | 出弯阈值相对入弯峰值的最小比例 |
 | `CAR_ARC_SUPPRESS_MS` | 400 | 直角/状态切换后的静默时间 |
 
 > 如果圆弧提示偏早/偏晚，先看调试遥测里的 `CURV` 峰值，再调
