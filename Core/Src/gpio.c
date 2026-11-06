@@ -7,7 +7,7 @@
  *
  * 电机方向：PE7/PE8（左）、PE12/PE13（右），默认低电平停止。
  * STBY：PE14，默认待机。
- * 八路循迹：幻尔 I2C 模块，PB8/PB9 在 track_sensor.c 中单独初始化。
+ * 八路循迹：PD2~PD9，上拉输入。
  * 超声波 TRIG：PA1，默认低。
  * 蜂鸣器：PB0 在 buzzer.c 中单独初始化，低电平触发。
  *
@@ -40,6 +40,14 @@ void MX_GPIO_Init(void)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    /* 八路循迹：连续 8 个引脚，上拉输入 */
+    const uint16_t track_pins =
+        (uint16_t)(((1U << TRACK_PIN_COUNT) - 1U) << TRACK_FIRST_PIN);
+    GPIO_InitStruct.Pin = track_pins;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(TRACK_PORT, &GPIO_InitStruct);
 
     /* 超声波 TRIG */
     HAL_GPIO_WritePin(ULTRA_TRIG_PORT, ULTRA_TRIG_PIN, GPIO_PIN_RESET);

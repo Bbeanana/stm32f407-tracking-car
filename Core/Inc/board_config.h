@@ -11,8 +11,7 @@
  * 说明：
  *   - 电机驱动板每路需要 PWM + INA + INB，两路共用一个 STBY。
  *   - EA1/EA2、EB1/EB2 按两路编码器 A/B 使用。
- *   - 幻尔八路循迹使用独立 I2C：PB8=SCL，PB9=SDA。
- *   - 128x64 OLED 使用独立 I2C：PB10=SCL，PB11=SDA。
+ *   - 八路循迹使用 PD2~PD9，低 8 位连续排列，便于一次读取。
  *   - 超声波 HC-SR04：PA1=TRIG，PA0=TIM5_CH1=ECHO。
  *   - 驱动板 ADC 输出接 PC0（ADC1_IN10），仅作遥测，不参与控制。
  *   - 调试串口 USART2：PA2=TX，PA3=RX，115200。
@@ -44,19 +43,11 @@
 #define ENC_L_TIM                (&htim3)             /* PC6/PC7  TIM3_CH1/CH2 */
 #define ENC_R_TIM                (&htim4)             /* PD12/PD13 TIM4_CH1/CH2 */
 
-/* ---------------------- 幻尔八路循迹（独立 UART） ---------------------- */
-/* USART1：PA9=TX，PA10=RX，115200 8N1，和调试串口 USART2 分开。
- * 传感器 TX 接 PA10，传感器 RX 接 PA9。 */
-#define TRACK_UART_INSTANCE       USART1
-#define TRACK_UART_BAUD           115200U
-#define TRACK_UART_TX_PORT        GPIOA
-#define TRACK_UART_TX_PIN         GPIO_PIN_9
-#define TRACK_UART_RX_PORT        GPIOA
-#define TRACK_UART_RX_PIN         GPIO_PIN_10
-/* 如果模拟值黑白方向相反（黑线读数反而更大），改成 1 */
-#define TRACK_ANALOG_INVERT       0U
-/* 如果模块装反（通道 1 在车头右侧），改成 1 反转偏差方向 */
-#define TRACK_REVERSE_ORDER       0U
+/* ---------------------------- 八路循迹输入 ------------------------------ */
+/* 通道 0 = PD2（车头最左），通道 7 = PD9（车头最右） */
+#define TRACK_PORT               GPIOD
+#define TRACK_FIRST_PIN          2U
+#define TRACK_PIN_COUNT          8U
 
 /* ------------------------------- 超声波 -------------------------------- */
 #define ULTRA_TRIG_PORT          GPIOA

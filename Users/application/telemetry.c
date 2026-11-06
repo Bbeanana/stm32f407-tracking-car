@@ -3,12 +3,10 @@
 #include <stdio.h>
 
 #include "main.h"
-#include "board_config.h"
 #include "car_config.h"
 #include "car_control.h"
 #include "motion.h"
 #include "current_sense.h"
-#include "track_sensor.h"
 
 /**
  * @brief 初始化调试串口输出
@@ -19,8 +17,7 @@ void Telemetry_Init(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("\r\n# tracking_car ready\r\n");
 #if CAR_BRINGUP_MODE == 3
-    printf("# UART sensor: USART1 115200, PA9=TX PA10=RX\r\n");
-    printf("# calibration mode: UART=communication THR=thresholds RAW=mask ACT=analog mask A=8 analog values\r\n");
+    printf("# calibration mode: RAW=raw pins ACT=active mask |bar| E=error D=cm U=valid\r\n");
 #else
     printf("# S=state D=cm U=ultra_valid M=mask E=err T=L/R target V=L/R speed C=L/R count A=adc F=fault\r\n");
 #endif
@@ -31,8 +28,8 @@ void Telemetry_Init(void)
 /**
  * @brief 传感器校准模式：RAW/ACT 掩码 + 8 位可视化条
  *
- * 通道 1 显示在 bar 的最左边。
- * 移动黑线时观察 RAW、ACT 和 A 的变化。
+ * 通道 0（PD2，最左）显示在 bar 的最左边。
+ * 调整模块电位器时观察 bar 和 ACT 的变化即可。
  */
 static void Telemetry_PrintCalibration(void)
 {
@@ -45,19 +42,11 @@ static void Telemetry_PrintCalibration(void)
     }
     bar[8] = '\0';
 
-    printf("CAL UART=%u THR=%u RAW=%02X ACT=%02X |%s| E=%+.2f A=",
-           Car_GetTrackCommOk(),
-           Car_GetTrackThresholdOk(),
+    printf("CAL RAW=%02X ACT=%02X |%s| E=%+.2f D=%.1f U=%u\r\n",
            raw,
            act,
            bar,
-           (double)Car_GetTrackError());
-
-    for (uint8_t i = 0U; i < 8U; i++) {
-        printf("%u ", Car_GetTrackAnalog(i));
-    }
-
-    printf("D=%.1f U=%u\r\n",
+           (double)Car_GetTrackError(),
            (double)Car_GetDistanceCm(),
            Car_GetUltrasonicValid());
 }
