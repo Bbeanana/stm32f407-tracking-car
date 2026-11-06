@@ -232,12 +232,12 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
-| `CAR_LINE_BASE_SPEED_MPS` | 0.22 | 直线基础速度 |
-| `CAR_LINE_MIN_SPEED_MPS` | 0.05 | 大偏差时最低基础速度 |
-| `CAR_LINE_MAX_SPEED_MPS` | 0.45 | 单轮最大速度 |
+| `CAR_LINE_BASE_SPEED_MPS` | 0.15 | 直线基础速度（先低速调试） |
+| `CAR_LINE_MIN_SPEED_MPS` | 0.04 | 大偏差时最低基础速度 |
+| `CAR_LINE_MAX_SPEED_MPS` | 0.34 | 单轮最大速度 |
 | `CAR_LINE_KP` | 0.35 | 偏差比例系数，越大修正越猛 |
 | `CAR_LINE_KD` | 0.05 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.25 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.18 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.35 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
@@ -380,9 +380,10 @@ OB 3         障碍物次数
 | 参数 | 默认 | 说明 |
 |---|---:|---|
 | `CAR_SPEED_CLOSED_LOOP` | 1 | 1=编码器闭环；0=开环占空比 |
-| `CAR_SPEED_PID_KP` | 1.50 | 速度环 Kp |
-| `CAR_SPEED_PID_KI` | 0.80 | 速度环 Ki |
-| `CAR_SPEED_RAMP_MPS2` | 1.50 | 加减速斜坡，防止猛冲 |
+| `CAR_SPEED_PID_KP` | 0.90 | 速度环 Kp（降低以减小超调） |
+| `CAR_SPEED_PID_KI` | 0.25 | 速度环 Ki（降低以抑制积分饱和） |
+| `CAR_SPEED_PID_MAX_INTEGRAL` | 0.40 | 积分限幅 |
+| `CAR_SPEED_RAMP_MPS2` | 1.00 | 加减速斜坡，防止起步猛冲 |
 | `CAR_MAX_WHEEL_SPEED_MPS` | 0.55 | 单轮最大速度 |
 | `CAR_ENCODER_CPR` | 1560 | 输出轴一圈计数（必须标定） |
 | `CAR_WHEEL_RADIUS_M` | 0.0325 | 车轮半径（65mm 轮径） |

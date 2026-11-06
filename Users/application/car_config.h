@@ -27,12 +27,12 @@
 /* 1=通道顺序与车头左右相反（例如模块装反了） */
 #define TRACK_REVERSE_ORDER              0
 
-#define CAR_LINE_BASE_SPEED_MPS          0.22f
-#define CAR_LINE_MIN_SPEED_MPS           0.05f
-#define CAR_LINE_MAX_SPEED_MPS           0.45f
+#define CAR_LINE_BASE_SPEED_MPS          0.15f
+#define CAR_LINE_MIN_SPEED_MPS           0.04f
+#define CAR_LINE_MAX_SPEED_MPS           0.34f
 #define CAR_LINE_KP                      0.35f
 #define CAR_LINE_KD                      0.05f
-#define CAR_LINE_TURN_LIMIT_MPS          0.25f
+#define CAR_LINE_TURN_LIMIT_MPS          0.18f
 #define CAR_LINE_ERROR_FILTER            0.35f   /* 0~1，越小越平滑 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
@@ -115,18 +115,18 @@
 
 /* 单轮最大线速度与加减速斜坡 */
 #define CAR_MAX_WHEEL_SPEED_MPS          0.55f
-#define CAR_SPEED_RAMP_MPS2              1.50f
+#define CAR_SPEED_RAMP_MPS2              1.00f   /* 先放缓加速，减小起步超调 */
 #define CAR_SPEED_DEADBAND_MPS           0.010f
 #define CAR_SPEED_STOP_EPS_MPS           0.020f
 #define CAR_WHEEL_TRIM_L                 1.000f
 #define CAR_WHEEL_TRIM_R                 1.000f
 
 /* 速度环 PID（5ms 周期，先调 Kp，再少量加 Ki） */
-#define CAR_SPEED_PID_KP                 1.50f
-#define CAR_SPEED_PID_KI                 0.80f
+#define CAR_SPEED_PID_KP                 0.90f   /* 降低比例，减小超调 */
+#define CAR_SPEED_PID_KI                 0.25f   /* 降低积分，避免积分饱和 */
 #define CAR_SPEED_PID_KD                 0.00f
 #define CAR_SPEED_PID_MAX_OUT            1.00f
-#define CAR_SPEED_PID_MAX_INTEGRAL       0.70f
+#define CAR_SPEED_PID_MAX_INTEGRAL       0.40f   /* 原 0.70，积分限幅收紧 */
 
 /* 驱动板 PWM 占空比范围 */
 #define CAR_MOTOR_MIN_DUTY               0.05f
