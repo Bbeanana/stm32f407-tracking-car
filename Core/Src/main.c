@@ -16,6 +16,7 @@
 #include "board_config.h"
 #include "bsp_delay.h"
 #include "bsp_uart.h"
+#include "buzzer.h"
 #include "car_control.h"
 #include "current_sense.h"
 #include "telemetry.h"
@@ -38,6 +39,7 @@ int main(void)
     MX_TIM5_Init();     /* 超声波 ECHO 输入捕获 */
     MX_USART2_UART_Init();
     MX_ADC1_Init();
+    Buzzer_Init();      /* 蜂鸣器 PB0，低电平触发，默认关闭 */
 
     BSP_UART_Init(DEBUG_UART_HANDLE);
     CurrentSense_Init();
@@ -45,6 +47,9 @@ int main(void)
     /* 应用初始化：电机、编码器、循迹、超声波 */
     Car_Init();
     Telemetry_Init();
+
+    /* 上电短鸣一声，用来确认蜂鸣器接线/极性正确 */
+    Buzzer_Beep(120U);
 
     uint32_t last_tick = HAL_GetTick();
 
@@ -62,6 +67,7 @@ int main(void)
             }
 
             Car_Loop(dt);
+            Buzzer_Update();    /* 处理 Buzzer_Beep() 的定时关闭 */
             Telemetry_Update();
         }
     }
