@@ -237,7 +237,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_MAX_SPEED_MPS` | 0.30 | 单轮最大速度 |
 | `CAR_LINE_KP` | 0.24 | 偏差比例系数，越大修正越猛 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.15 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.17 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |

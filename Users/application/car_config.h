@@ -32,7 +32,7 @@
 #define CAR_LINE_MAX_SPEED_MPS           0.30f
 #define CAR_LINE_KP                      0.24f   /* 介于灵敏和稳定之间 */
 #define CAR_LINE_KD                      0.10f   /* 增加阻尼，抑制来回摆 */
-#define CAR_LINE_TURN_LIMIT_MPS          0.15f   /* 转向限幅适中 */
+#define CAR_LINE_TURN_LIMIT_MPS          0.17f   /* 转向限幅适中 */
 #define CAR_LINE_ERROR_FILTER            0.25f   /* 平滑一点，减少高频抖动 */
 #define CAR_LINE_ERROR_DEADBAND          0.08f   /* 小死区，避免过度修正 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
