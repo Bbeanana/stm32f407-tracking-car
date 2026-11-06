@@ -47,65 +47,28 @@ static uint8_t s_search_phase;
 static uint32_t s_search_phase_tick;
 #endif
 
-/* 圆弧弯道提示状态（摄像头 CURV） */
+/* 圆弧弯道提示状态（摄像头 CURV 入弯 + 实际运动时间出弯） */
 static uint8_t s_arc_active;
 static uint8_t s_arc_stage;   /* 0=本圈未入弯, 1=已入弯, 2=已出弯 */
 static uint8_t s_arc_lap;
-static float s_arc_peak;
 static uint32_t s_arc_candidate_tick;
-static uint32_t s_arc_entry_tick;
-static uint32_t s_arc_exit_tick;
+static uint32_t s_arc_motion_ms;
+static uint32_t s_arc_last_tick;
 static uint8_t s_arc_suppressed;
 static uint32_t s_arc_resume_tick;
 static uint32_t s_arc_last_beep_tick;
 
-/* CURV 历史移动平均，用于抑制圆弧中间的短时抖动 */
-static float s_curv_hist[CAR_CAM_ARC_CURV_FILTER_N];
-static uint8_t s_curv_hist_index;
-static uint8_t s_curv_hist_count;
-static float s_curv_hist_sum;
-
-static void Car_CurvFilterReset(void)
-{
-    for (uint8_t i = 0U; i < CAR_CAM_ARC_CURV_FILTER_N; i++) {
-        s_curv_hist[i] = 0.0f;
-    }
-    s_curv_hist_index = 0U;
-    s_curv_hist_count = 0U;
-    s_curv_hist_sum = 0.0f;
-}
-
-static float Car_CurvFilterUpdate(float value)
-{
-    if (s_curv_hist_count < CAR_CAM_ARC_CURV_FILTER_N) {
-        s_curv_hist[s_curv_hist_index] = value;
-        s_curv_hist_sum += value;
-        s_curv_hist_count++;
-    } else {
-        s_curv_hist_sum -= s_curv_hist[s_curv_hist_index];
-        s_curv_hist[s_curv_hist_index] = value;
-        s_curv_hist_sum += value;
-    }
-
-    s_curv_hist_index++;
-    if (s_curv_hist_index >= CAR_CAM_ARC_CURV_FILTER_N) {
-        s_curv_hist_index = 0U;
-    }
-
-    return s_curv_hist_sum / (float)s_curv_hist_count;
-}
-
 /**
- * @brief 复位圆弧检测；suppress=1 时在 CAR_ARC_SUPPRESS_MS 内不提示
+ * @brief 复位圆弧检测；suppress=1 时在 CAR_ARC_SUPPRESS_MS 内不提示。
+ *
+ * 注意：不在这里清零 s_arc_motion_ms，障碍物 STOP 只暂停计时，
+ * 重新恢复循迹后继续累计。
  */
 static void Car_ArcReset(uint8_t suppress, uint32_t now)
 {
     s_arc_active = 0U;
-    s_arc_peak = 0.0f;
     s_arc_candidate_tick = 0U;
-    s_arc_entry_tick = 0U;
-    s_arc_exit_tick = 0U;
-    Car_CurvFilterReset();
+    s_arc_last_tick = 0U;
 
     if (suppress) {
         s_arc_suppressed = 1U;
@@ -130,35 +93,30 @@ static void Car_ArcBeep(uint32_t now)
 }
 
 /**
- * @brief 圆弧弯道进出检测（摄像头 CURV）
+ * @brief 圆弧入弯判断 + 固定实际运动时间后出弯提示
  *
- * 直道 CURV 接近 0，圆弧一般在 8~35°，直角弯会出现 >45° 的尖峰。
- * 超过 MAX 时按直角弯处理并静默，不产生圆弧蜂鸣。
+ * 入弯仍用摄像头 CURV；出弯不再看 CURV，而是从入弯开始累计
+ * 左右轮实际在转的时间。障碍物停车、摄像头无效停车期间不累计。
  */
 static void Car_ArcUpdate(uint32_t now)
 {
 #if CAR_ARC_BEEP_ENABLE
     float abs_curv;
 
-    /* 第一圈真正开始移动前、完赛后都不做圆弧提示。
-     * 状态切换时已经复位过，这里只返回，避免反复延长静默时间。 */
     if (!LapTimer_IsRunning()) {
         return;
     }
 
-    /* 每一圈只允许一段圆弧提示：入弯一声、出弯一声。
-     * 圆弧中间 CURV 抖动或出弯后的直角弯不再重复响。 */
+    /* 每圈只允许一段圆弧提示；换圈时重新开始。 */
     {
         uint8_t lap = LapTimer_GetCurrentLap();
         if (lap != s_arc_lap) {
             s_arc_lap = lap;
             s_arc_stage = 0U;
             s_arc_active = 0U;
-            s_arc_peak = 0.0f;
             s_arc_candidate_tick = 0U;
-            s_arc_entry_tick = 0U;
-            s_arc_exit_tick = 0U;
-            Car_CurvFilterReset();
+            s_arc_motion_ms = 0U;
+            s_arc_last_tick = 0U;
         }
     }
 
@@ -166,24 +124,22 @@ static void Car_ArcUpdate(uint32_t now)
         return;
     }
 
-    abs_curv = fabsf(Camera_GetCurvatureDeg());
+    if (s_arc_stage == 0U) {
+        abs_curv = fabsf(Camera_GetCurvatureDeg());
 
-    /* 直角弯/异常大曲率：复位圆弧状态，避免把直角弯当圆弧 */
-    if (abs_curv > CAR_CAM_ARC_MAX_DEG) {
-        Car_ArcReset(1U, now);
-        return;
-    }
-
-    float curv_filtered = Car_CurvFilterUpdate(abs_curv);
-
-    if (s_arc_suppressed) {
-        if ((int32_t)(now - s_arc_resume_tick) < 0) {
+        /* 直角弯/异常大曲率：不当作圆弧 */
+        if (abs_curv > CAR_CAM_ARC_MAX_DEG) {
+            Car_ArcReset(1U, now);
             return;
         }
-        s_arc_suppressed = 0U;
-    }
 
-    if (s_arc_stage == 0U) {
+        if (s_arc_suppressed) {
+            if ((int32_t)(now - s_arc_resume_tick) < 0) {
+                return;
+            }
+            s_arc_suppressed = 0U;
+        }
+
         if (abs_curv >= CAR_CAM_ARC_ENTER_DEG) {
             if (s_arc_candidate_tick == 0U) {
                 s_arc_candidate_tick = now;
@@ -191,45 +147,41 @@ static void Car_ArcUpdate(uint32_t now)
                        CAR_CAM_ARC_ENTER_MS) {
                 s_arc_candidate_tick = 0U;
                 s_arc_active = 1U;
-                s_arc_entry_tick = now;
-                s_arc_peak = abs_curv;
-                s_arc_exit_tick = 0U;
+                s_arc_motion_ms = 0U;
+                s_arc_last_tick = now;
                 s_arc_stage = 1U;
                 Car_ArcBeep(now);
             }
         } else {
             s_arc_candidate_tick = 0U;
         }
-    } else if (s_arc_stage == 1U) {
-        if (abs_curv > s_arc_peak) {
-            s_arc_peak = abs_curv;
-        }
+        return;
+    }
 
-        /* 防止圆弧中间 CURV 短时掉到 0 附近时提前报出弯 */
-        if ((uint32_t)(now - s_arc_entry_tick) < CAR_CAM_ARC_MIN_MS) {
-            s_arc_exit_tick = 0U;
-            return;
-        }
+    /* stage == 1：累计实际运动时间，不看 CURV 出弯形状。 */
+    if (s_arc_last_tick == 0U) {
+        /* 从障碍物 STOP / 摄像头无效恢复后的第一帧，不把间隔算进去 */
+        s_arc_last_tick = now;
+        return;
+    }
 
-        float exit_threshold = CAR_CAM_ARC_EXIT_DEG;
-        float relative_exit = s_arc_peak * CAR_CAM_ARC_EXIT_RATIO;
-        if (relative_exit > exit_threshold) {
-            exit_threshold = relative_exit;
-        }
+    {
+        uint32_t delta = (uint32_t)(now - s_arc_last_tick);
+        s_arc_last_tick = now;
 
-        if (curv_filtered <= exit_threshold) {
-            if (s_arc_exit_tick == 0U) {
-                s_arc_exit_tick = now;
-            } else if ((uint32_t)(now - s_arc_exit_tick) >=
-                       CAR_CAM_ARC_EXIT_MS) {
-                s_arc_active = 0U;
-                s_arc_exit_tick = 0U;
-                s_arc_stage = 2U;
-                Car_ArcBeep(now);
+        /* 主循环异常停顿或刚恢复时不累计这段空档 */
+        if (delta <= CAR_ARC_MOTION_MAX_DELTA_MS) {
+            if (fabsf(Motion_GetSpeedL()) >= CAR_ARC_MOTION_SPEED_MPS ||
+                fabsf(Motion_GetSpeedR()) >= CAR_ARC_MOTION_SPEED_MPS) {
+                s_arc_motion_ms += delta;
             }
-        } else {
-            s_arc_exit_tick = 0U;
         }
+    }
+
+    if (s_arc_motion_ms >= CAR_CAM_ARC_EXIT_MOTION_MS) {
+        s_arc_active = 0U;
+        s_arc_stage = 2U;
+        Car_ArcBeep(now);
     }
 #else
     (void)now;

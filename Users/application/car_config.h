@@ -78,13 +78,11 @@
 /* 摄像头 CURV 圆弧检测：直道约 0°，圆弧约 8~35°，直角弯 >45°。
  * 只用于圆弧进出蜂鸣，不参与转向。 */
 #define CAR_CAM_ARC_ENTER_DEG            8.0f
-#define CAR_CAM_ARC_EXIT_DEG             4.0f
 #define CAR_CAM_ARC_MAX_DEG              40.0f  /* 超过该值按直角弯处理，不蜂鸣 */
 #define CAR_CAM_ARC_ENTER_MS             100U
-#define CAR_CAM_ARC_EXIT_MS              200U   /* 连续低值确认时间 */
-#define CAR_CAM_ARC_MIN_MS               400U   /* 入弯后至少这么久才允许出弯 */
-#define CAR_CAM_ARC_CURV_FILTER_N        20U    /* CURV 历史移动平均窗口，约 100ms */
-#define CAR_CAM_ARC_EXIT_RATIO           0.40f  /* 出弯阈值至少为入弯峰值的 40% */
+#define CAR_CAM_ARC_EXIT_MOTION_MS       10000U /* 入弯后累计实际运动 10s 报出弯 */
+#define CAR_ARC_MOTION_SPEED_MPS         0.010f /* 低于该轮速视为停车，不计时 */
+#define CAR_ARC_MOTION_MAX_DELTA_MS       50U   /* 单次采样间隔过大按暂停处理 */
 
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */

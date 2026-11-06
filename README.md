@@ -327,19 +327,15 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 
 只对**圆弧弯道**提示，直角弯道不提示。进入圆弧和退出圆弧各短响一声（默认 80ms）；如果一圈只有一个圆弧，一圈共 2 声。
 
-判断逻辑在 `car_control.c`，使用摄像头的 `CURV`：
+判断逻辑在 `car_control.c`：
 
-- `|CURV|` 持续大于 `CAR_CAM_ARC_ENTER_DEG` 达到
-  `CAR_CAM_ARC_ENTER_MS` → 进入圆弧，响一声
-- `CURV` 经过历史移动平均后，持续小于出弯阈值达到
-  `CAR_CAM_ARC_EXIT_MS` → 退出圆弧，响一声
-- 出弯阈值至少取 `CAR_CAM_ARC_EXIT_DEG` 与入弯峰值的
-  `CAR_CAM_ARC_EXIT_RATIO` 两者中的较大值，避免出弯时曲率没有完全归零而漏响
-- `|CURV|` 大于 `CAR_CAM_ARC_MAX_DEG` → 按直角弯处理，复位并静默
-  `CAR_ARC_SUPPRESS_MS`，不产生圆弧提示
-- 每一圈只允许一段圆弧提示：入弯一声、出弯一声；圆弧中间 `CURV` 抖动
-  或出弯后到起点的直角弯不再重复响
-- 每次状态切换后会静默 `CAR_ARC_SUPPRESS_MS`，避免起步和找线时误响
+- 入弯：`|CURV|` 持续大于 `CAR_CAM_ARC_ENTER_DEG` 达到
+  `CAR_CAM_ARC_ENTER_MS` → 响一声
+- 出弯：从入弯开始累计**左右轮实际转动时间**，达到
+  `CAR_CAM_ARC_EXIT_MOTION_MS`（默认 10s）→ 响一声
+- 障碍物停车、摄像头无效停车期间不累计时间；恢复运动后继续累计
+- 每一圈只允许一组入弯/出弯提示；圆弧中间的 `CURV` 抖动不会再触发
+- 两声圆弧提示之间至少间隔 `CAR_ARC_BEEP_MIN_GAP_MS`（默认 3s）
 
 | 参数 | 默认 | 说明 |
 |---|---:|---|
@@ -347,19 +343,15 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 | `CAR_ARC_BEEP_MS` | 80 | 每次提示鸣叫时间 |
 | `CAR_ARC_BEEP_MIN_GAP_MS` | 3000 | 任意两声圆弧提示的最小间隔 |
 | `CAR_CAM_ARC_ENTER_DEG` | 8 | 进入圆弧的 CURV 阈值 |
-| `CAR_CAM_ARC_EXIT_DEG` | 4 | 退出圆弧的 CURV 阈值 |
 | `CAR_CAM_ARC_MAX_DEG` | 40 | 超过该值按直角弯处理 |
 | `CAR_CAM_ARC_ENTER_MS` | 100 | 进入圆弧确认时间 |
-| `CAR_CAM_ARC_EXIT_MS` | 200 | 退出圆弧确认时间 |
-| `CAR_CAM_ARC_MIN_MS` | 400 | 入弯后至少这么久才允许出弯 |
-| `CAR_CAM_ARC_CURV_FILTER_N` | 20 | CURV 历史移动平均窗口（约 100ms） |
-| `CAR_CAM_ARC_EXIT_RATIO` | 0.40 | 出弯阈值相对入弯峰值的最小比例 |
+| `CAR_CAM_ARC_EXIT_MOTION_MS` | 10000 | 入弯后累计实际运动时间到 10s 报出弯 |
+| `CAR_ARC_MOTION_SPEED_MPS` | 0.010 | 低于该轮速视为停车，不计时 |
+| `CAR_ARC_MOTION_MAX_DELTA_MS` | 50 | 单次间隔过大按暂停处理 |
 | `CAR_ARC_SUPPRESS_MS` | 400 | 直角/状态切换后的静默时间 |
 
-> 如果圆弧提示偏早/偏晚，先看调试遥测里的 `CURV` 峰值，再调
-> `CAR_CAM_ARC_ENTER_DEG` / `CAR_CAM_ARC_EXIT_DEG` 和确认时间。
-> 如果圆弧被误判成直角弯，降低 `CAR_CAM_ARC_MAX_DEG` 或提高
-> `CAR_CAM_CORNER_ENTER_DEG`。
+> 入弯提示偏早/偏晚时调 `CAR_CAM_ARC_ENTER_DEG` 和 `CAR_CAM_ARC_ENTER_MS`；
+> 出弯提示时间直接调 `CAR_CAM_ARC_EXIT_MOTION_MS`。
 
 ### 圈计时与 128x64 OLED
 
