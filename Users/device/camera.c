@@ -27,6 +27,12 @@ static float s_curvature_deg;
 static uint8_t s_valid;
 static uint32_t s_last_packet_tick;
 
+/* 调试计数器：可通过 ST-Link 直接读取 */
+volatile uint32_t g_camera_rx_bytes;
+volatile uint32_t g_camera_valid_frames;
+volatile uint32_t g_camera_bad_frames;
+volatile uint8_t g_camera_last_packet[14];
+
 static float Camera_Clamp(float value, float min_value, float max_value)
 {
     if (value > max_value) {
@@ -74,6 +80,9 @@ void Camera_Init(void)
     s_angle_deg = 0.0f;
     s_curvature_deg = 0.0f;
     s_valid = 0U;
+    g_camera_rx_bytes = 0U;
+    g_camera_valid_frames = 0U;
+    g_camera_bad_frames = 0U;
     s_last_packet_tick = HAL_GetTick();
 
     if (!s_uart_ready) {
@@ -92,6 +101,7 @@ void Camera_UartIrqHandler(void)
     }
 
     uint8_t data = (uint8_t)USART1->DR;
+    g_camera_rx_bytes++;
     uint8_t next = (uint8_t)((s_rx_head + 1U) & CAMERA_RX_MASK);
 
     if (next != s_rx_tail) {
@@ -100,19 +110,23 @@ void Camera_UartIrqHandler(void)
     }
 }
 
-static void Camera_ParseFrame(void)
+static void Camera_ParseFrame(uint8_t length)
 {
     float err;
     float ang;
-    float curv;
+    float curv = 0.0f;
 
-    if (s_packet[13] != 0x5AU) {
+    if (s_packet[length - 1U] != 0x5AU) {
+        g_camera_bad_frames++;
         return;
     }
 
     memcpy(&err, &s_packet[1], sizeof(float));
     memcpy(&ang, &s_packet[5], sizeof(float));
-    memcpy(&curv, &s_packet[9], sizeof(float));
+
+    if (length >= 14U) {
+        memcpy(&curv, &s_packet[9], sizeof(float));
+    }
 
     if (err != err || ang != ang || curv != curv) {   /* NaN */
         return;
@@ -123,6 +137,7 @@ static void Camera_ParseFrame(void)
     s_curvature_deg = curv;
     s_last_packet_tick = HAL_GetTick();
     s_valid = 1U;
+    g_camera_valid_frames++;
 }
 
 void Camera_Update(void)
@@ -148,8 +163,29 @@ void Camera_Update(void)
             s_packet[s_packet_index++] = data;
         }
 
+        /* 兼容旧 10 字节帧：A5 + ERR + ANG + 5A。
+         * 10 字节帧后面紧跟下一帧的 A5 时，可以无歧义识别。 */
+        if (s_packet_index == 11U &&
+            s_packet[9] == 0x5AU && s_packet[10] == 0xA5U) {
+            for (uint8_t i = 0U; i < CAMERA_FRAME_LEN; i++) {
+                g_camera_last_packet[i] = (i < 10U) ? s_packet[i] : 0U;
+            }
+
+            Camera_ParseFrame(10U);
+
+            /* 当前字节是下一帧的帧头，直接开始下一帧 */
+            s_packet[0] = 0xA5U;
+            s_packet_index = 1U;
+            s_in_frame = 1U;
+            continue;
+        }
+
         if (s_packet_index >= CAMERA_FRAME_LEN) {
-            Camera_ParseFrame();
+            for (uint8_t i = 0U; i < CAMERA_FRAME_LEN; i++) {
+                g_camera_last_packet[i] = s_packet[i];
+            }
+
+            Camera_ParseFrame(CAMERA_FRAME_LEN);
 
             s_in_frame = 0U;
             s_packet_index = 0U;
