@@ -64,7 +64,13 @@
 /* 起点在第二个右直角弯末端：每圈经过 2 个右直角弯；记录前 2 圈 */
 #define CAR_LAP_CORNERS                  2U
 #define CAR_LAP_COUNT                    2U
-#define CAR_LAP_CORNER_DEBOUNCE_MS       300U  /* 同一个弯道重复找回线时防重复计数 */
+#define CAR_LAP_CORNER_DEBOUNCE_MS       300U  /* 同一个弯道重复触发时防重复计数 */
+
+/* 摄像头 CURV 直角弯检测：圆弧约 0~30°，直角弯通常 >45° */
+#define CAR_CAM_CORNER_ENTER_DEG         45.0f
+#define CAR_CAM_CORNER_EXIT_DEG          15.0f
+#define CAR_CAM_CORNER_ENTER_MS          40U
+#define CAR_CAM_CORNER_EXIT_MS           100U
 
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */

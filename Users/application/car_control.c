@@ -7,6 +7,7 @@
 #include "buzzer.h"
 #include "camera.h"
 #include "car_config.h"
+#include "lap_timer.h"
 #include "tim.h"
 #include "motion.h"
 #include "track_sensor.h"
@@ -27,6 +28,11 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 static uint8_t s_line_ever_seen;
+
+/* 摄像头 CURV 直角弯检测状态 */
+static uint8_t s_cam_corner_active;
+static uint32_t s_cam_corner_entry_tick;
+static uint32_t s_cam_corner_exit_tick;
 
 #if !CAR_RIGHT_TURNS_ONLY
 /* 左右弯都可能时，记录丢线前最后一次有效偏差的方向 */
@@ -285,11 +291,57 @@ static uint8_t Car_ObstacleDetected(void)
 }
 
 /**
+ * @brief 用摄像头 CURV 检测直角弯
+ *
+ * 圆弧的 CURV 较小；直角弯的远近线角度差会出现明显尖峰。
+ * 进入阈值持续一段时间后置位，回落到退出阈值后计一次弯道。
+ */
+static void Car_CameraCornerUpdate(uint32_t now)
+{
+    float abs_curv = fabsf(Camera_GetCurvatureDeg());
+
+    if (!s_cam_corner_active) {
+        if (abs_curv >= CAR_CAM_CORNER_ENTER_DEG) {
+            if (s_cam_corner_entry_tick == 0U) {
+                s_cam_corner_entry_tick = now;
+            } else if ((uint32_t)(now - s_cam_corner_entry_tick) >=
+                       CAR_CAM_CORNER_ENTER_MS) {
+                s_cam_corner_active = 1U;
+                s_cam_corner_entry_tick = 0U;
+                s_cam_corner_exit_tick = 0U;
+            }
+        } else {
+            s_cam_corner_entry_tick = 0U;
+        }
+    } else {
+        if (abs_curv <= CAR_CAM_CORNER_EXIT_DEG) {
+            if (s_cam_corner_exit_tick == 0U) {
+                s_cam_corner_exit_tick = now;
+            } else if ((uint32_t)(now - s_cam_corner_exit_tick) >=
+                       CAR_CAM_CORNER_EXIT_MS) {
+                s_cam_corner_active = 0U;
+                s_cam_corner_exit_tick = 0U;
+                LapTimer_OnRightAngle();
+            }
+        } else {
+            s_cam_corner_exit_tick = 0U;
+        }
+    }
+}
+
+/**
  * @brief 正常循迹状态
  */
 static void Car_LineLoop(void)
 {
     uint32_t now = HAL_GetTick();
+
+    /* 两圈完成，锁存停车 */
+    if (LapTimer_IsFinished()) {
+        Motion_Brake();
+        Car_EnterState(CAR_STATE_STOP);
+        return;
+    }
 
     if (Car_ObstacleDetected()) {
         /* 检测到障碍物只停车，不再执行后退/转向绕行 */
@@ -311,6 +363,14 @@ static void Car_LineLoop(void)
 
     /* 仅保留圆弧蜂鸣提示；前八路不参与转向 */
     Car_ArcUpdate(now, error, 0U, 0U);
+
+    /* 摄像头 CURV 直角弯计数；第二圈完成立即停车 */
+    Car_CameraCornerUpdate(now);
+    if (LapTimer_IsFinished()) {
+        Motion_Brake();
+        Car_EnterState(CAR_STATE_STOP);
+        return;
+    }
 
     s_error_filtered +=
         CAR_LINE_ERROR_FILTER * (error - s_error_filtered);
@@ -397,6 +457,11 @@ static void Car_SearchLoop(void)
 static void Car_StopLoop(void)
 {
     Motion_Brake();
+
+    /* 跑完两圈后保持停车，不自动恢复 */
+    if (LapTimer_IsFinished()) {
+        return;
+    }
 
     if (s_stop_by_obstacle) {
 #if CAR_OBSTACLE_STOP_LATCH

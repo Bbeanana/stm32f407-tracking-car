@@ -54,36 +54,6 @@ void LapTimer_Update(void)
         }
     }
 
-    /* 每完成一个右直角弯（SEARCH -> LINE），累计一个弯道计数。
-     * 同一个弯道如果中途又丢线一次，短时间内不重复计数。 */
-    if (state == CAR_STATE_LINE && s_prev_state == CAR_STATE_SEARCH) {
-        if (s_running) {
-            uint32_t now = HAL_GetTick();
-
-            if (!s_corner_seen ||
-                (uint32_t)(now - s_last_corner_ms) >=
-                    CAR_LAP_CORNER_DEBOUNCE_MS) {
-                s_corner_seen = 1U;
-                s_last_corner_ms = now;
-                s_corner_count++;
-
-                if (s_corner_count >= CAR_LAP_CORNERS &&
-                    s_lap_index < CAR_LAP_COUNT) {
-                    s_lap_ms[s_lap_index] = now - s_lap_start_ms;
-                    s_lap_valid[s_lap_index] = 1U;
-
-                    s_lap_start_ms = now;
-                    s_corner_count = 0U;
-                    s_lap_index++;
-
-                    if (s_lap_index >= CAR_LAP_COUNT) {
-                        s_running = 0U;
-                    }
-                }
-            }
-        }
-    }
-
     /* 进入避障 STOP 时计数一次；同一个障碍物不会重复累加 */
     if (state == CAR_STATE_STOP && s_prev_state != CAR_STATE_STOP &&
         Car_IsObstacle()) {
@@ -91,6 +61,47 @@ void LapTimer_Update(void)
     }
 
     s_prev_state = state;
+}
+
+/**
+ * @brief 外部（摄像头 CURV）判定一个直角弯完成
+ */
+void LapTimer_OnRightAngle(void)
+{
+    if (!s_running) {
+        return;
+    }
+
+    uint32_t now = HAL_GetTick();
+
+    /* 同一个弯道短时间内不重复计数 */
+    if (s_corner_seen &&
+        (uint32_t)(now - s_last_corner_ms) < CAR_LAP_CORNER_DEBOUNCE_MS) {
+        return;
+    }
+
+    s_corner_seen = 1U;
+    s_last_corner_ms = now;
+    s_corner_count++;
+
+    if (s_corner_count >= CAR_LAP_CORNERS &&
+        s_lap_index < CAR_LAP_COUNT) {
+        s_lap_ms[s_lap_index] = now - s_lap_start_ms;
+        s_lap_valid[s_lap_index] = 1U;
+
+        s_lap_start_ms = now;
+        s_corner_count = 0U;
+        s_lap_index++;
+
+        if (s_lap_index >= CAR_LAP_COUNT) {
+            s_running = 0U;
+        }
+    }
+}
+
+uint8_t LapTimer_IsFinished(void)
+{
+    return (s_started && !s_running && s_lap_index >= CAR_LAP_COUNT) ? 1U : 0U;
 }
 
 uint32_t LapTimer_GetLapMs(uint8_t index)

@@ -71,7 +71,7 @@ int main(void)
             }
 
             Car_Loop(dt);
-            LapTimer_Update();      /* 检测发车、直角弯完成、障碍物事件 */
+            LapTimer_Update();      /* 检测发车、障碍物事件 */
             OledDisplay_Update();   /* 数据变化时重绘，并分块刷新显存 */
             Buzzer_Update();        /* 处理 Buzzer_Beep() 的定时关闭 */
             Telemetry_Update();
