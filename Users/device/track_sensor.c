@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include "board_config.h"
+
 static uint8_t TrackSensor_ReverseBits(uint8_t value, uint8_t count)
 {
     uint8_t out = 0U;
@@ -63,6 +65,11 @@ void TrackSensor_Init(TrackSensor_t *sensor, const TrackSensor_Config_t *cfg)
     sensor->history[0] = mask;
     sensor->history[1] = mask;
     sensor->stable_mask = mask;
+
+    /* 用初始状态填满低通值，避免上电第一拍从 0 慢慢爬升 */
+    for (uint8_t i = 0U; i < 8U; i++) {
+        sensor->channel[i] = (mask & (uint8_t)(1U << i)) ? 1.0f : 0.0f;
+    }
 }
 
 /**
@@ -98,6 +105,13 @@ void TrackSensor_Update(TrackSensor_t *sensor)
     sensor->history[1] = active;
     sensor->stable_mask = stable;
 
+    /* 每路一阶低通：把数字 0/1 变成连续的 0~1 权重 */
+    for (uint8_t i = 0U; i < 8U; i++) {
+        float target = (stable & (uint8_t)(1U << i)) ? 1.0f : 0.0f;
+        sensor->channel[i] +=
+            TRACK_LPF_ALPHA * (target - sensor->channel[i]);
+    }
+
     uint8_t count = TrackSensor_CountBits(stable);
     if (count == 0U) {
         sensor->lost = 1U;
@@ -118,14 +132,17 @@ void TrackSensor_Update(TrackSensor_t *sensor)
 
     const float center = ((float)sensor->cfg.pin_count - 1.0f) * 0.5f;
     float sum = 0.0f;
+    float weighted = 0.0f;
 
     for (uint8_t i = 0U; i < sensor->cfg.pin_count; i++) {
-        if (stable & (1U << i)) {
-            sum += ((float)i - center) / center;
-        }
+        float value = sensor->channel[i];
+        sum += value;
+        weighted += value * (((float)i - center) / center);
     }
 
-    sensor->error = sum / (float)count;
+    if (sum > 0.0001f) {
+        sensor->error = weighted / sum;
+    }
 }
 
 uint8_t TrackSensor_GetMask(const TrackSensor_t *sensor)
@@ -166,6 +183,14 @@ float TrackSensor_GetError(const TrackSensor_t *sensor)
         return 0.0f;
     }
     return sensor->error;
+}
+
+float TrackSensor_GetChannel(const TrackSensor_t *sensor, uint8_t index)
+{
+    if (sensor == NULL || !sensor->inited || index >= 8U) {
+        return 0.0f;
+    }
+    return sensor->channel[index];
 }
 
 uint32_t TrackSensor_GetLastSeenTick(const TrackSensor_t *sensor)

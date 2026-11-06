@@ -49,6 +49,10 @@
 #define TRACK_FIRST_PIN          2U
 #define TRACK_PIN_COUNT          8U
 
+/* 每路数字量的一阶低通系数：0~1，越小越平滑但越滞后。
+ * 5ms 周期下 0.15 约等于 30ms 时间常数。 */
+#define TRACK_LPF_ALPHA          0.15f
+
 /* ------------------------------- 超声波 -------------------------------- */
 #define ULTRA_TRIG_PORT          GPIOA
 #define ULTRA_TRIG_PIN           GPIO_PIN_1

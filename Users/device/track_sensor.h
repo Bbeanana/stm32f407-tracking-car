@@ -32,6 +32,7 @@ typedef struct {
     uint8_t active_mask;        /* 已转换极性：1=压线 */
     uint8_t stable_mask;        /* 三取二滤波后的结果 */
     uint8_t history[2];
+    float channel[8];           /* 每路一阶低通后的 0~1 权重 */
     float error;
     uint8_t lost;
     uint8_t all_active;
@@ -47,6 +48,7 @@ uint8_t TrackSensor_GetRawMask(const TrackSensor_t *sensor);
 uint8_t TrackSensor_IsLost(const TrackSensor_t *sensor);
 uint8_t TrackSensor_IsAllActive(const TrackSensor_t *sensor);
 float TrackSensor_GetError(const TrackSensor_t *sensor);
+float TrackSensor_GetChannel(const TrackSensor_t *sensor, uint8_t index);
 uint32_t TrackSensor_GetLastSeenTick(const TrackSensor_t *sensor);
 
 #endif /* TRACK_SENSOR_H */

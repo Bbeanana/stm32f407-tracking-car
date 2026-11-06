@@ -241,6 +241,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_ERROR_FILTER` | 0.20 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.15 | 中心死区，抑制数字量抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
+| `TRACK_LPF_ALPHA` | 0.15 | 每路 0/1 的一阶低通系数，越小越平滑但越滞后 |
 | `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
