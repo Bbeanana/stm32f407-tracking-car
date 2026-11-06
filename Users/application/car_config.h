@@ -36,10 +36,14 @@
 #define CAR_LINE_ERROR_FILTER            0.35f   /* 0~1，越小越平滑 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
-/* 丢线：短暂保持上一次偏差，超过时间则原地找线 */
+/* 丢线/直角弯找线：短暂保持上一次偏差，超过时间则原地双向找线 */
 #define CAR_LOST_STOP_MS                 120U
-#define CAR_SEARCH_SPEED_MPS             0.10f
-#define CAR_SEARCH_TIMEOUT_MS            1500U
+#define CAR_SEARCH_SPEED_MPS             0.12f
+#define CAR_SEARCH_TIMEOUT_MS            3400U   /* 两段找线的总时间 */
+#define CAR_SEARCH_PHASE_MS              1200U   /* 第一段找线时间，超时后反向 */
+#define CAR_SEARCH_HINT_MS               800U    /* 最后一次有效偏差的方向有效期 */
+#define CAR_SEARCH_HINT_MIN_ERROR        0.10f   /* 记录转向提示的最小 |E| */
+#define CAR_SEARCH_DEFAULT_DIR           (+1)    /* 没有方向提示时先向右转 */
 #define CAR_AUTO_RESUME                  1
 
 /* ----------------------------- 超声波避障 ----------------------------- */

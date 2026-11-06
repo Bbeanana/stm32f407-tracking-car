@@ -26,6 +26,13 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 
+/* 直角弯找线提示：记录丢线前最后一次有效偏差的方向 */
+static float s_last_turn_hint;
+static uint32_t s_last_turn_hint_tick;
+static int8_t s_search_dir;
+static uint8_t s_search_phase;
+static uint32_t s_search_phase_tick;
+
 /* 圆弧弯道提示状态 */
 static uint8_t s_arc_active;
 static uint8_t s_arc_candidate;
@@ -165,6 +172,19 @@ static void Car_EnterState(CarState_t state)
     /* 状态切换后先静默一段时间，避免把重新找线/起步当成圆弧 */
     Car_ArcReset(1U, s_state_tick);
 
+    if (state == CAR_STATE_SEARCH) {
+        /* 优先朝丢线前最后看到线的方向转；没有有效提示时用默认方向 */
+        s_search_phase = 0U;
+        s_search_phase_tick = s_state_tick;
+        s_search_dir = (CAR_SEARCH_DEFAULT_DIR >= 0) ? 1 : -1;
+
+        if ((uint32_t)(s_state_tick - s_last_turn_hint_tick) <=
+                CAR_SEARCH_HINT_MS &&
+            fabsf(s_last_turn_hint) >= CAR_SEARCH_HINT_MIN_ERROR) {
+            s_search_dir = (s_last_turn_hint >= 0.0f) ? 1 : -1;
+        }
+    }
+
     if (state == CAR_STATE_LINE) {
         s_error_filtered = TrackSensor_GetError(&s_track);
         s_last_error = s_error_filtered;
@@ -212,6 +232,11 @@ void Car_Init(void)
     s_last_error = 0.0f;
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
+    s_last_turn_hint = 0.0f;
+    s_last_turn_hint_tick = 0U;
+    s_search_dir = (CAR_SEARCH_DEFAULT_DIR >= 0) ? 1 : -1;
+    s_search_phase = 0U;
+    s_search_phase_tick = s_state_tick;
     Car_ArcReset(1U, s_state_tick);
 }
 
@@ -267,6 +292,13 @@ static void Car_LineLoop(void)
         error = 0.0f;   /* 十字/宽黑线：直行通过 */
     }
 
+    /* 记住丢线前最后一段有效的偏线方向，供直角弯原地找线使用 */
+    if (!track_lost && !all_active &&
+        fabsf(error) >= CAR_SEARCH_HINT_MIN_ERROR) {
+        s_last_turn_hint = error;
+        s_last_turn_hint_tick = now;
+    }
+
     Car_ArcUpdate(now, error, track_lost, all_active);
 
     s_error_filtered +=
@@ -294,7 +326,7 @@ static void Car_LineLoop(void)
 }
 
 /**
- * @brief 丢线搜索：按最后偏差方向原地慢转
+ * @brief 丢线/直角弯搜索：先按最后偏线方向原地转，超时后反向再找
  */
 static void Car_SearchLoop(void)
 {
@@ -318,8 +350,16 @@ static void Car_SearchLoop(void)
         return;
     }
 
+    /* 第一段没找到线就立即反向，避免方向提示错误时一直转下去 */
+    if (s_search_phase == 0U &&
+        (uint32_t)(now - s_search_phase_tick) >= CAR_SEARCH_PHASE_MS) {
+        s_search_dir = (int8_t)(-s_search_dir);
+        s_search_phase = 1U;
+        s_search_phase_tick = now;
+    }
+
     float search = CAR_SEARCH_SPEED_MPS;
-    if (s_last_error >= 0.0f) {
+    if (s_search_dir > 0) {
         /* 线原先在右侧：左轮前进、右轮后退 → 原地右转 */
         Motion_SetWheelSpeeds(search, -search);
     } else {

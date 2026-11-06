@@ -226,8 +226,12 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_ERROR_FILTER` | 0.35 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
-| `CAR_SEARCH_SPEED_MPS` | 0.10 | 原地找线速度 |
-| `CAR_SEARCH_TIMEOUT_MS` | 1500 | 找线超时后停车 |
+| `CAR_SEARCH_SPEED_MPS` | 0.12 | 原地找线速度 |
+| `CAR_SEARCH_TIMEOUT_MS` | 3400 | 双向找线总时间，超时后停车 |
+| `CAR_SEARCH_PHASE_MS` | 1200 | 第一段找线时间，超时后反向 |
+| `CAR_SEARCH_HINT_MS` | 800 | 丢线前方向提示的有效期 |
+| `CAR_SEARCH_HINT_MIN_ERROR` | 0.10 | 记录方向提示的最小偏差 |
+| `CAR_SEARCH_DEFAULT_DIR` | +1 | 没有方向提示时先向右转 |
 
 控制律：
 
@@ -348,7 +352,7 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 INIT ──1.2s──> LINE ──障碍<8cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
                  ├──丢线>120ms──> SEARCH ──找到线3次──> LINE
-                 │                  └──1.5s未找到──> STOP
+                 │                  └──双向找线3.4s未找到──> STOP
                  └──编码器故障──> FAULT
 ```
 
@@ -356,7 +360,9 @@ INIT ──1.2s──> LINE ──障碍<8cm──> STOP ──障碍移开>15cm
 - `STOP`：停车。若因障碍物触发，障碍物移开（`> CAR_OBSTACLE_CLEAR_CM`
   并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS`）且线仍在，可自动恢复循迹；
   `CAR_OBSTACLE_STOP_LATCH=1` 时则一直停车，直到复位。
-- `SEARCH`：按最后一次偏差方向原地慢转找线。
+- `SEARCH`：优先按丢线前最后一次有效偏线方向原地转；`CAR_SEARCH_PHASE_MS`
+  内没找到就反向再找，总时间超过 `CAR_SEARCH_TIMEOUT_MS` 后停车。
+  这样即使方向提示错误，也能通过反向扫描找到直角弯后的线。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -395,6 +401,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0
 | 一给速度就报 `F=2` | 编码器没信号/没接，检查 VCC/GND/A/B |
 | 车直线画龙 | 降低 `CAR_LINE_KP`，适当加 `CAR_LINE_KD`，或减小 `CAR_LINE_ERROR_FILTER` |
 | 弯道冲出线 | 降低 `CAR_LINE_BASE_SPEED_MPS`，加大 `CAR_LINE_KP` |
+| 直角弯丢线后转不回来 | 增大 `CAR_SEARCH_PHASE_MS`/`CAR_SEARCH_TIMEOUT_MS`，检查 `CAR_SEARCH_DEFAULT_DIR`；实车看丢线前 `E=` 的符号是否正确 |
 | 循迹掩码全 0 | `TRACK_ACTIVE_LEVEL` 配反，或传感器没供电 |
 | 循迹掩码全 1 | 同上；也可能是车不在线上 |
 | 超声波一直 999 或不变 | ECHO 没接 PA0、模块没供电、TRIG 电平不够 |
