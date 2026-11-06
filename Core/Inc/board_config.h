@@ -15,6 +15,7 @@
  *   - 超声波 HC-SR04：PA1=TRIG，PA0=TIM5_CH1=ECHO。
  *   - 驱动板 ADC 输出接 PC0（ADC1_IN10），仅作遥测，不参与控制。
  *   - 调试串口 USART2：PA2=TX，PA3=RX，115200。
+ *   - 蜂鸣器接 PB0，低电平触发（当前工程未占用 PB0）。
  * ========================================================================= */
 
 /* ---------------------------- 左电机（A 路） ---------------------------- */
@@ -58,6 +59,14 @@
 #define CURRENT_ADC_CHANNEL      10U                   /* PC0 ADC1_IN10 */
 #define CURRENT_ADC_PORT         GPIOC
 #define CURRENT_ADC_PIN          GPIO_PIN_0
+
+/* ------------------------------- 蜂鸣器 -------------------------------- */
+/* 当前固件未使用 PB0；蜂鸣器模块 I/O 接 PB0。
+ * BUZZER_ACTIVE_LEVEL = 0：低电平触发（本车用）
+ *                       1：高电平触发（改为 1 即可，不用改驱动代码） */
+#define BUZZER_PORT              GPIOB
+#define BUZZER_PIN               GPIO_PIN_0
+#define BUZZER_ACTIVE_LEVEL      0U
 
 /* ------------------------------- 调试串口 ------------------------------- */
 #define DEBUG_UART_HANDLE        (&huart2)
