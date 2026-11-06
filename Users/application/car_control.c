@@ -25,6 +25,7 @@ static uint32_t s_obstacle_clear_tick;
 static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
+static uint8_t s_line_ever_seen;
 
 #if !CAR_RIGHT_TURNS_ONLY
 /* 左右弯都可能时，记录丢线前最后一次有效偏差的方向 */
@@ -248,6 +249,7 @@ void Car_Init(void)
     s_last_error = 0.0f;
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
+    s_line_ever_seen = 0U;
 #if !CAR_RIGHT_TURNS_ONLY
     s_last_turn_hint = 0.0f;
     s_last_turn_hint_tick = 0U;
@@ -296,11 +298,22 @@ static void Car_LineLoop(void)
         if ((uint32_t)(now - TrackSensor_GetLastSeenTick(&s_track)) >
             CAR_LOST_STOP_MS) {
             Motion_Brake();
+
+#if CAR_START_REQUIRE_LINE
+            /* 上电后从未见过线：先停车检查摆放/接线，不要直接右转搜索 */
+            if (!s_line_ever_seen) {
+                Car_EnterState(CAR_STATE_STOP);
+                return;
+            }
+#endif
+
             Car_EnterState(CAR_STATE_SEARCH);
             return;
         }
         /* 短暂丢线：继续使用上一次偏差通过小缝隙 */
     } else {
+        s_line_ever_seen = 1U;
+
         if (s_line_seen_count < 250U) {
             s_line_seen_count++;
         }

@@ -241,6 +241,7 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_ERROR_FILTER` | 0.35 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `CAR_RIGHT_TURNS_ONLY` | 1 | 1=只有右转弯：找线固定向右，圆弧提示只认右偏；0=左右弯都可能 |
+| `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
 | `CAR_LOST_STOP_MS` | 120 | 丢线多久后进入找线 |
 | `CAR_SEARCH_SPEED_MPS` | 0.10 | 原地找线速度 |
 | `CAR_SEARCH_RIGHT_TIMEOUT_MS` | 2200 | 只有右转时的单向找线时间 |
@@ -423,6 +424,8 @@ INIT ──1.2s──> LINE ──障碍<8cm──> STOP ──障碍移开>15cm
   后反向搜索。
 - 底盘为**两个后轮差速驱动 + 前万向轮**：原地找线时绕后轴旋转，车头的
   八路传感器会扫过直角弯后的线。找线速度取 0.10m/s，避免车头扫得太快漏线。
+- 上电后从未检测到线时，`CAR_START_REQUIRE_LINE=1` 会先停车，不进入
+  `SEARCH`，避免传感器没接线或车没放正时一上电就原地右转。
 - `FAULT`：电机驱动板 STBY 拉低，必须断电重启。
 
 ---
@@ -457,6 +460,7 @@ S=LINE D=25.3 U=1 M=18 E=+0.12 T=0.22/0.18 V=0.21/0.18 C=1234/1220 A=0.02 F=0
 | 现象 | 排查 |
 |---|---|
 | 上电不跑 | 看串口是否停在 `INIT`；检查 `CAR_START_DELAY_MS`、电机 STBY |
+| 上电后原地右转 | 传感器没有检测到线，程序进入了 `SEARCH`；检查车头传感器是否压在线上、`M=` 是否非 0、`TRACK_ACTIVE_LEVEL` 是否配反。若上电后从未见过线，`CAR_START_REQUIRE_LINE=1` 会改为停车 |
 | 一给速度就报 `F=1` | 编码器方向反了，改 `CAR_ENCODER_*_INVERT` 或对调 A/B |
 | 一给速度就报 `F=2` | 编码器没信号/没接，检查 VCC/GND/A/B |
 | 车直线画龙 | 降低 `CAR_LINE_KP`，适当加 `CAR_LINE_KD`，或减小 `CAR_LINE_ERROR_FILTER` |
