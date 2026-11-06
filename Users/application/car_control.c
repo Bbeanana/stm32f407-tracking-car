@@ -405,15 +405,6 @@ static void Car_LineLoop(void)
     float delta = control_error - s_last_error;
     float turn = CAR_LINE_KP * control_error + CAR_LINE_KD * delta;
 
-    /* 小偏差保持 KP=0.28 的稳定性；直角弯的大偏差额外加转向量，
-     * 避免直角弯反应慢、出线。 */
-    float abs_control = fabsf(control_error);
-    if (abs_control > CAR_LINE_SHARP_ERROR) {
-        float extra = CAR_LINE_SHARP_GAIN *
-                      (abs_control - CAR_LINE_SHARP_ERROR);
-        turn += (control_error >= 0.0f) ? extra : -extra;
-    }
-
     turn = CarClamp(turn, -CAR_LINE_TURN_LIMIT_MPS, CAR_LINE_TURN_LIMIT_MPS);
 
     float base = CAR_LINE_BASE_SPEED_MPS *

@@ -260,11 +260,9 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_BASE_SPEED_MPS` | 0.24 | 直线基础速度（再提速 20%） |
 | `CAR_LINE_MIN_SPEED_MPS` | 0.084 | 大偏差时最低基础速度 |
 | `CAR_LINE_MAX_SPEED_MPS` | 0.60 | 单轮最大速度 |
-| `CAR_LINE_KP` | 0.28 | 小偏差比例系数，兼顾直线稳定 |
+| `CAR_LINE_KP` | 0.24 | 偏差比例系数，兼顾转向和稳定 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_SHARP_ERROR` | 0.30 | 超过该偏差启用直角弯额外转向 |
-| `CAR_LINE_SHARP_GAIN` | 0.30 | 大偏差额外转向增益 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.42 | 差速转向限幅 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.336 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |

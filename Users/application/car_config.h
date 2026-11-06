@@ -33,12 +33,9 @@
 #define CAR_LINE_BASE_SPEED_MPS          0.24f
 #define CAR_LINE_MIN_SPEED_MPS           0.084f
 #define CAR_LINE_MAX_SPEED_MPS           0.60f
-#define CAR_LINE_KP                      0.28f   /* 直线/小偏差比例增益 */
+#define CAR_LINE_KP                      0.24f   /* 介于灵敏和稳定之间 */
 #define CAR_LINE_KD                      0.10f   /* 增加阻尼，抑制来回摆 */
-#define CAR_LINE_TURN_LIMIT_MPS          0.42f   /* 差速转向限幅 */
-/* 大偏差时额外增加转向量，用于直角弯快速打角；不影响小偏差直线稳定性 */
-#define CAR_LINE_SHARP_ERROR             0.30f
-#define CAR_LINE_SHARP_GAIN              0.30f
+#define CAR_LINE_TURN_LIMIT_MPS          0.336f  /* 再提速 20% 后同步放大 */
 #define CAR_LINE_ERROR_FILTER            0.25f   /* 平滑一点，减少高频抖动 */
 #define CAR_LINE_ERROR_DEADBAND          0.08f   /* 小死区，避免过度修正 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
