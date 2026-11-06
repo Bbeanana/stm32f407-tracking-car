@@ -19,6 +19,8 @@
 #include "buzzer.h"
 #include "car_control.h"
 #include "current_sense.h"
+#include "lap_timer.h"
+#include "matrix_display.h"
 #include "telemetry.h"
 
 void SystemClock_Config(void);
@@ -44,8 +46,10 @@ int main(void)
     BSP_UART_Init(DEBUG_UART_HANDLE);
     CurrentSense_Init();
 
-    /* 应用初始化：电机、编码器、循迹、超声波 */
+    /* 应用初始化：电机、编码器、循迹、超声波、圈计时、点阵 */
     Car_Init();
+    LapTimer_Init();
+    MatrixDisplay_Init();
     Telemetry_Init();
 
     /* 上电短鸣一声，用来确认蜂鸣器接线/极性正确 */
@@ -67,7 +71,9 @@ int main(void)
             }
 
             Car_Loop(dt);
-            Buzzer_Update();    /* 处理 Buzzer_Beep() 的定时关闭 */
+            LapTimer_Update();      /* 检测发车、直角弯完成、障碍物事件 */
+            MatrixDisplay_Update();
+            Buzzer_Update();        /* 处理 Buzzer_Beep() 的定时关闭 */
             Telemetry_Update();
         }
     }

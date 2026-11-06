@@ -52,6 +52,12 @@
 #define CAR_SEARCH_DEFAULT_DIR           (+1)    /* 没有方向提示时先向右转 */
 #define CAR_AUTO_RESUME                  1
 
+/* ------------------------------- 圈计时 -------------------------------- */
+/* 起点在第二个右直角弯末端：每圈经过 2 个右直角弯；记录前 2 圈 */
+#define CAR_LAP_CORNERS                  2U
+#define CAR_LAP_COUNT                    2U
+#define CAR_LAP_CORNER_DEBOUNCE_MS       300U  /* 同一个弯道重复找回线时防重复计数 */
+
 /* ----------------------------- 超声波避障 ----------------------------- */
 /* 策略：距离小于 STOP_CM 立即刹车停车，不再后退/转向绕行。 */
 #define CAR_OBSTACLE_ENABLE              1

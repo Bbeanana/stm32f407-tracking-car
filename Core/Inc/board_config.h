@@ -68,6 +68,19 @@
 #define BUZZER_PIN               GPIO_PIN_0
 #define BUZZER_ACTIVE_LEVEL      0U
 
+/* --------------------------- MAX7219 8x8 点阵 ---------------------------- */
+/* 单个 8x8 模块，软件模拟 SPI。PB10/PB12/PB13 当前工程未占用。 */
+#define MAX7219_DIN_PORT         GPIOB
+#define MAX7219_DIN_PIN          GPIO_PIN_10
+#define MAX7219_CS_PORT          GPIOB
+#define MAX7219_CS_PIN           GPIO_PIN_12
+#define MAX7219_CLK_PORT         GPIOB
+#define MAX7219_CLK_PIN          GPIO_PIN_13
+#define MAX7219_INTENSITY        6U              /* 0~15 */
+/* 如果显示上下/左右反了，改这两个开关，不用拆模块 */
+#define MAX7219_FLIP_X           0U
+#define MAX7219_FLIP_Y           0U
+
 /* ------------------------------- 调试串口 ------------------------------- */
 #define DEBUG_UART_HANDLE        (&huart2)
 
