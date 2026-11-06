@@ -50,7 +50,7 @@
 #define TRACK_I2C_SCL_PIN         GPIO_PIN_8
 #define TRACK_I2C_SDA_PORT        GPIOB
 #define TRACK_I2C_SDA_PIN         GPIO_PIN_9
-#define TRACK_I2C_ADDR            0x5DU
+#define TRACK_I2C_ADDR            0x12U
 /* 如果模拟值黑白方向相反（黑线读数反而更大），改成 1 */
 #define TRACK_ANALOG_INVERT       0U
 /* 如果模块装反（通道 1 在车头右侧），改成 1 反转偏差方向 */

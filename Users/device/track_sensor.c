@@ -5,6 +5,7 @@
 
 #include "board_config.h"
 #include "bsp_delay.h"
+#include "car_config.h"
 #include "main.h"
 
 #define TRACK_I2C_DELAY_US      5U
@@ -17,6 +18,44 @@
 
 static uint32_t s_last_read_tick;
 static uint32_t s_last_threshold_tick;
+
+static void TrackI2cStart(void);
+static void TrackI2cStop(void);
+static uint8_t TrackI2cWriteByte(uint8_t value);
+static uint8_t TrackI2cReadReg(uint8_t reg, uint8_t *data, uint8_t len);
+
+#if CAR_BRINGUP_MODE == 3
+uint8_t g_track_i2c_scan[128];
+uint8_t g_track_i2c_count;
+uint8_t g_track_reg_dump[64];
+
+static uint8_t TrackI2cProbe(uint8_t address)
+{
+    TrackI2cStart();
+    uint8_t nack = TrackI2cWriteByte((uint8_t)(address << 1));
+    TrackI2cStop();
+    return (nack == 0U) ? 1U : 0U;
+}
+
+static void TrackSensor_ScanBus(void)
+{
+    g_track_i2c_count = 0U;
+
+    for (uint8_t address = 0x08U; address <= 0x77U; address++) {
+        if (TrackI2cProbe(address)) {
+            g_track_i2c_scan[g_track_i2c_count++] = address;
+        }
+    }
+
+    for (uint8_t reg = 0U; reg < 64U; reg++) {
+        uint8_t value = 0xFFU;
+        if (!TrackI2cReadReg(reg, &value, 1U)) {
+            value = 0xEEU;
+        }
+        g_track_reg_dump[reg] = value;
+    }
+}
+#endif
 
 static void TrackSclHigh(void)
 {
@@ -240,6 +279,10 @@ void TrackSensor_Init(TrackSensor_t *sensor)
 
     TrackSensor_I2cInit();
     BSP_DelayUs(100000U);  /* 等模块上电稳定 */
+
+#if CAR_BRINGUP_MODE == 3
+    TrackSensor_ScanBus();
+#endif
 
     (void)TrackSensor_ReadThresholds(sensor);
 
