@@ -4,19 +4,20 @@
 #include <stdint.h>
 
 /**
- * @brief 幻尔八路循迹传感器（I2C 模拟量）
+ * @brief 幻尔八路循迹传感器（UART 模拟量）
  *
- * 独立 I2C：PB8=SCL，PB9=SDA，地址 0x5D。
- * 读取 8 路模拟值和阈值，按暗线权重计算连续偏差：
+ * USART1：PA9=TX，PA10=RX，115200 8N1。
+ * 传感器 TX 接 PA10，传感器 RX 接 PA9。
+ *
+ * 使用手动模式：上电后发送 0 进入手动模式，之后每次发送 2
+ * 读取 8 路模拟量。返回帧：
+ *   0x55 0xAA 0x02 0x10 + 8×uint16(低字节在前) + 校验
+ *
+ * 偏差定义：
  *   -1.0 = 线在最左，0 = 线在中间，+1.0 = 线在最右。
- *
- * I2C 寄存器：
- *   0x05        8 路数字结果（1 字节）
- *   0x06..0x14  8 路模拟值（每路 uint16，低字节在前）
- *   0x16..0x24  8 路阈值（每路 uint16，低字节在前）
  */
 typedef struct {
-    uint8_t raw_mask;       /* I2C 数字结果，bit0=通道 1 */
+    uint8_t raw_mask;       /* 预留：数字量掩码 */
     uint8_t active_mask;    /* 按模拟值/阈值判断的压线掩码 */
     uint8_t stable_mask;    /* 与 active_mask 相同，保留兼容接口 */
     uint16_t analog[8];     /* 8 路模拟值 */
@@ -24,7 +25,7 @@ typedef struct {
     float error;
     uint8_t lost;
     uint8_t all_active;
-    uint8_t i2c_ok;
+    uint8_t comm_ok;
     uint8_t threshold_ok;
     uint32_t last_seen_tick;
     uint8_t inited;
@@ -39,6 +40,8 @@ uint8_t TrackSensor_IsLost(const TrackSensor_t *sensor);
 uint8_t TrackSensor_IsAllActive(const TrackSensor_t *sensor);
 float TrackSensor_GetError(const TrackSensor_t *sensor);
 uint16_t TrackSensor_GetAnalog(const TrackSensor_t *sensor, uint8_t index);
+uint8_t TrackSensor_GetCommOk(const TrackSensor_t *sensor);
+uint8_t TrackSensor_GetThresholdOk(const TrackSensor_t *sensor);
 uint32_t TrackSensor_GetLastSeenTick(const TrackSensor_t *sensor);
 
 #endif /* TRACK_SENSOR_H */

@@ -1,347 +1,116 @@
 #include "track_sensor.h"
 
-#include <math.h>
 #include <stddef.h>
 
 #include "board_config.h"
 #include "bsp_delay.h"
-#include "car_config.h"
 #include "main.h"
 
-#define TRACK_I2C_DELAY_US      5U
-#define TRACK_READ_PERIOD_MS    10U
-#define TRACK_REG_DIGITAL       0x05U
-#define TRACK_REG_ANALOG        0x06U
-#define TRACK_REG_THRESHOLD     0x16U
-#define TRACK_ADDR_WRITE        ((uint8_t)(TRACK_I2C_ADDR << 1))
-#define TRACK_ADDR_READ         ((uint8_t)(TRACK_ADDR_WRITE | 1U))
+#define TRACK_UART_FRAME_LEN    21U
+#define TRACK_UART_PERIOD_MS    20U
+#define TRACK_UART_TIMEOUT_MS   10U
+#define TRACK_CMD_MANUAL        0U
+#define TRACK_CMD_ANALOG        2U
+#define TRACK_CMD_THRESHOLD     3U
 
+static UART_HandleTypeDef s_uart;
+static uint8_t s_uart_ready;
+
+static uint8_t s_frame[TRACK_UART_FRAME_LEN];
 static uint32_t s_last_read_tick;
 static uint32_t s_last_threshold_tick;
 
-static void TrackI2cStart(void);
-static void TrackI2cStop(void);
-static uint8_t TrackI2cWriteByte(uint8_t value);
-static uint8_t TrackI2cReadReg(uint8_t reg, uint8_t *data, uint8_t len);
-
-#if CAR_BRINGUP_MODE == 3
-uint8_t g_track_i2c_scan[128];
-uint8_t g_track_i2c_count;
-uint8_t g_track_reg_dump[64];
-
-static uint8_t TrackI2cProbe(uint8_t address)
-{
-    TrackI2cStart();
-    uint8_t nack = TrackI2cWriteByte((uint8_t)(address << 1));
-    TrackI2cStop();
-    return (nack == 0U) ? 1U : 0U;
-}
-
-static void TrackSensor_ScanBus(void)
-{
-    g_track_i2c_count = 0U;
-
-    for (uint8_t address = 0x08U; address <= 0x77U; address++) {
-        if (TrackI2cProbe(address)) {
-            g_track_i2c_scan[g_track_i2c_count++] = address;
-        }
-    }
-
-    for (uint8_t reg = 0U; reg < 64U; reg++) {
-        uint8_t value = 0xFFU;
-        if (!TrackI2cReadReg(reg, &value, 1U)) {
-            value = 0xEEU;
-        }
-        g_track_reg_dump[reg] = value;
-    }
-}
-#endif
-
-static void TrackSclHigh(void)
-{
-    HAL_GPIO_WritePin(TRACK_I2C_SCL_PORT, TRACK_I2C_SCL_PIN, GPIO_PIN_SET);
-}
-
-static void TrackSclLow(void)
-{
-    HAL_GPIO_WritePin(TRACK_I2C_SCL_PORT, TRACK_I2C_SCL_PIN, GPIO_PIN_RESET);
-}
-
-static void TrackSdaHigh(void)
-{
-    HAL_GPIO_WritePin(TRACK_I2C_SDA_PORT, TRACK_I2C_SDA_PIN, GPIO_PIN_SET);
-}
-
-static void TrackSdaLow(void)
-{
-    HAL_GPIO_WritePin(TRACK_I2C_SDA_PORT, TRACK_I2C_SDA_PIN, GPIO_PIN_RESET);
-}
-
-static uint8_t TrackSdaRead(void)
-{
-    return (HAL_GPIO_ReadPin(TRACK_I2C_SDA_PORT, TRACK_I2C_SDA_PIN) ==
-            GPIO_PIN_SET) ? 1U : 0U;
-}
-
-static void TrackI2cStart(void)
-{
-    TrackSdaHigh();
-    TrackSclHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSdaLow();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSclLow();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-}
-
-static void TrackI2cStop(void)
-{
-    TrackSdaLow();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSclHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSdaHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-}
-
-/* 返回 0=收到 ACK，1=NACK/无器件 */
-static uint8_t TrackI2cWriteByte(uint8_t value)
-{
-    for (uint8_t i = 0U; i < 8U; i++) {
-        if (value & 0x80U) {
-            TrackSdaHigh();
-        } else {
-            TrackSdaLow();
-        }
-        BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-        TrackSclHigh();
-        BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-        TrackSclLow();
-        BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-        value <<= 1;
-    }
-
-    TrackSdaHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSclHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    uint8_t nack = TrackSdaRead();
-
-    TrackSclLow();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    return nack;
-}
-
-static uint8_t TrackI2cReadByte(uint8_t ack)
-{
-    uint8_t value = 0U;
-
-    TrackSdaHigh();
-
-    for (uint8_t i = 0U; i < 8U; i++) {
-        TrackSclHigh();
-        BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-        value = (uint8_t)((value << 1) | TrackSdaRead());
-
-        TrackSclLow();
-        BSP_DelayUs(TRACK_I2C_DELAY_US);
-    }
-
-    if (ack) {
-        TrackSdaLow();
-    } else {
-        TrackSdaHigh();
-    }
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSclHigh();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSclLow();
-    BSP_DelayUs(TRACK_I2C_DELAY_US);
-
-    TrackSdaHigh();
-
-    return value;
-}
-
-static uint8_t TrackI2cReadReg(uint8_t reg, uint8_t *data, uint8_t len)
-{
-    TrackI2cStart();
-
-    if (TrackI2cWriteByte(TRACK_ADDR_WRITE) != 0U) {
-        TrackI2cStop();
-        return 0U;
-    }
-    if (TrackI2cWriteByte(reg) != 0U) {
-        TrackI2cStop();
-        return 0U;
-    }
-
-    TrackI2cStart();
-    if (TrackI2cWriteByte(TRACK_ADDR_READ) != 0U) {
-        TrackI2cStop();
-        return 0U;
-    }
-
-    for (uint8_t i = 0U; i < len; i++) {
-        data[i] = TrackI2cReadByte((uint8_t)(i + 1U < len));
-    }
-
-    TrackI2cStop();
-    return 1U;
-}
-
-static uint8_t TrackI2cReadReg16(uint8_t reg, uint16_t *value)
-{
-    uint8_t data[2];
-
-    if (!TrackI2cReadReg(reg, data, 2U)) {
-        return 0U;
-    }
-
-    *value = (uint16_t)((uint16_t)data[0] |
-                        ((uint16_t)data[1] << 8));
-    return 1U;
-}
-
-static void TrackSensor_I2cInit(void)
+static uint8_t TrackUartInit(void)
 {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_USART1_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
 
-    TrackSclHigh();
-    TrackSdaHigh();
+    GPIO_InitStruct.Pin = TRACK_UART_TX_PIN | TRACK_UART_RX_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = TRACK_I2C_SCL_PIN | TRACK_I2C_SDA_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    s_uart.Instance = TRACK_UART_INSTANCE;
+    s_uart.Init.BaudRate = TRACK_UART_BAUD;
+    s_uart.Init.WordLength = UART_WORDLENGTH_8B;
+    s_uart.Init.StopBits = UART_STOPBITS_1;
+    s_uart.Init.Parity = UART_PARITY_NONE;
+    s_uart.Init.Mode = UART_MODE_TX_RX;
+    s_uart.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    s_uart.Init.OverSampling = UART_OVERSAMPLING_16;
+
+    if (HAL_UART_Init(&s_uart) != HAL_OK) {
+        return 0U;
+    }
+
+    return 1U;
+}
+
+static void TrackUartFlush(void)
+{
+    while (__HAL_UART_GET_FLAG(&s_uart, UART_FLAG_RXNE) != RESET) {
+        (void)s_uart.Instance->DR;
+    }
+    __HAL_UART_CLEAR_OREFLAG(&s_uart);
+}
+
+static uint8_t TrackUartReadFrame(uint8_t command, uint8_t *data)
+{
+    if (!s_uart_ready) {
+        return 0U;
+    }
+
+    TrackUartFlush();
+
+    if (HAL_UART_Transmit(&s_uart, &command, 1U, 5U) != HAL_OK) {
+        return 0U;
+    }
+
+    if (HAL_UART_Receive(&s_uart, s_frame, TRACK_UART_FRAME_LEN,
+                         TRACK_UART_TIMEOUT_MS) != HAL_OK) {
+        return 0U;
+    }
+
+    if (s_frame[0] != 0x55U || s_frame[1] != 0xAAU ||
+        s_frame[2] != command || s_frame[3] != 0x10U) {
+        return 0U;
+    }
+
+    for (uint8_t i = 0U; i < 16U; i++) {
+        data[i] = s_frame[4U + i];
+    }
+
+    return 1U;
 }
 
 static uint8_t TrackSensor_ReadThresholds(TrackSensor_t *sensor)
 {
-    uint8_t threshold_ok = 1U;
+    uint8_t data[16];
 
-    for (uint8_t i = 0U; i < 8U; i++) {
-        if (!TrackI2cReadReg16((uint8_t)(TRACK_REG_THRESHOLD + 2U * i),
-                               &sensor->threshold[i])) {
-            threshold_ok = 0U;
-            break;
-        }
-        if (sensor->threshold[i] == 0U || sensor->threshold[i] == 0xFFFFU) {
-            threshold_ok = 0U;
-        }
+    if (!TrackUartReadFrame(TRACK_CMD_THRESHOLD, data)) {
+        sensor->threshold_ok = 0U;
+        return 0U;
     }
 
-    sensor->threshold_ok = threshold_ok;
-    return threshold_ok;
-}
-
-/**
- * @brief 初始化传感器并读取一次阈值
- *
- * 幻尔模块上电后需要一点时间；阈值由模块的一键学习功能写入。
- */
-void TrackSensor_Init(TrackSensor_t *sensor)
-{
-    if (sensor == NULL) {
-        return;
-    }
-
-    sensor->raw_mask = 0U;
-    sensor->active_mask = 0U;
-    sensor->stable_mask = 0U;
-    sensor->error = 0.0f;
-    sensor->lost = 1U;
-    sensor->all_active = 0U;
-    sensor->i2c_ok = 0U;
-    sensor->last_seen_tick = HAL_GetTick();
-    sensor->threshold_ok = 0U;
-
-    for (uint8_t i = 0U; i < 8U; i++) {
-        sensor->analog[i] = 0U;
-        sensor->threshold[i] = 0U;
-    }
-
-    TrackSensor_I2cInit();
-    BSP_DelayUs(100000U);  /* 等模块上电稳定 */
-
-#if CAR_BRINGUP_MODE == 3
-    TrackSensor_ScanBus();
-#endif
-
-    (void)TrackSensor_ReadThresholds(sensor);
-
-    sensor->inited = 1U;
-    s_last_read_tick = HAL_GetTick();
-    s_last_threshold_tick = s_last_read_tick;
-}
-
-void TrackSensor_Update(TrackSensor_t *sensor)
-{
-    if (sensor == NULL || !sensor->inited) {
-        return;
-    }
-
-    uint32_t now = HAL_GetTick();
-    if ((uint32_t)(now - s_last_read_tick) < TRACK_READ_PERIOD_MS) {
-        return;
-    }
-    s_last_read_tick = now;
-
-    /* 模块刚上电/刚按过学习键时阈值可能还读不到，定期重试 */
-    if (!sensor->threshold_ok &&
-        (uint32_t)(now - s_last_threshold_tick) >= 1000U) {
-        s_last_threshold_tick = now;
-        (void)TrackSensor_ReadThresholds(sensor);
-    }
-
-    uint8_t digital = 0U;
-    uint16_t analog[8];
     uint8_t ok = 1U;
-
-    if (!TrackI2cReadReg(TRACK_REG_DIGITAL, &digital, 1U)) {
-        ok = 0U;
-    }
-
     for (uint8_t i = 0U; i < 8U; i++) {
-        if (!TrackI2cReadReg16((uint8_t)(TRACK_REG_ANALOG + 2U * i),
-                               &analog[i])) {
+        sensor->threshold[i] = (uint16_t)((uint16_t)data[2U * i] |
+                                          ((uint16_t)data[2U * i + 1U] << 8));
+        if (sensor->threshold[i] == 0U || sensor->threshold[i] == 0xFFFFU) {
             ok = 0U;
-            break;
         }
     }
 
-    if (!ok) {
-        sensor->i2c_ok = 0U;
-        sensor->lost = 1U;
-        sensor->all_active = 0U;
-        sensor->active_mask = 0U;
-        sensor->stable_mask = 0U;
-        return;
-    }
+    sensor->threshold_ok = ok;
+    return ok;
+}
 
-    sensor->i2c_ok = 1U;
-    sensor->raw_mask = digital;
-
-    for (uint8_t i = 0U; i < 8U; i++) {
-        sensor->analog[i] = analog[i];
-    }
-
+static void TrackSensor_ComputeError(TrackSensor_t *sensor)
+{
     uint8_t mask = 0U;
     uint32_t sum = 0U;
     float weighted = 0.0f;
@@ -350,9 +119,9 @@ void TrackSensor_Update(TrackSensor_t *sensor)
         for (uint8_t i = 0U; i < 8U; i++) {
             int32_t dark;
 #if TRACK_ANALOG_INVERT
-            dark = (int32_t)analog[i] - (int32_t)sensor->threshold[i];
+            dark = (int32_t)sensor->analog[i] - (int32_t)sensor->threshold[i];
 #else
-            dark = (int32_t)sensor->threshold[i] - (int32_t)analog[i];
+            dark = (int32_t)sensor->threshold[i] - (int32_t)sensor->analog[i];
 #endif
             if (dark > 0) {
                 mask |= (uint8_t)(1U << i);
@@ -365,25 +134,24 @@ void TrackSensor_Update(TrackSensor_t *sensor)
             }
         }
     } else {
-        /* 没有读到有效阈值时，用 8 路最大/最小值做粗略归一化 */
         uint16_t max_value = 0U;
         uint16_t min_value = 0xFFFFU;
 
         for (uint8_t i = 0U; i < 8U; i++) {
-            if (analog[i] > max_value) {
-                max_value = analog[i];
+            if (sensor->analog[i] > max_value) {
+                max_value = sensor->analog[i];
             }
-            if (analog[i] < min_value) {
-                min_value = analog[i];
+            if (sensor->analog[i] < min_value) {
+                min_value = sensor->analog[i];
             }
         }
 
         for (uint8_t i = 0U; i < 8U; i++) {
             int32_t dark;
 #if TRACK_ANALOG_INVERT
-            dark = (int32_t)analog[i] - (int32_t)min_value;
+            dark = (int32_t)sensor->analog[i] - (int32_t)min_value;
 #else
-            dark = (int32_t)max_value - (int32_t)analog[i];
+            dark = (int32_t)max_value - (int32_t)sensor->analog[i];
 #endif
             if (dark > 0) {
                 mask |= (uint8_t)(1U << i);
@@ -399,6 +167,7 @@ void TrackSensor_Update(TrackSensor_t *sensor)
 
     sensor->active_mask = mask;
     sensor->stable_mask = mask;
+    sensor->raw_mask = mask;
 
     uint8_t count = 0U;
     for (uint8_t i = 0U; i < 8U; i++) {
@@ -431,6 +200,90 @@ void TrackSensor_Update(TrackSensor_t *sensor)
     if (sensor->error < -1.0f) {
         sensor->error = -1.0f;
     }
+}
+
+/**
+ * @brief 初始化 UART 传感器
+ *
+ * 幻尔八路循迹 UART 上电后只接受一次模式命令：
+ * 0=手动模式，之后用 2/3 分别读模拟量/阈值。
+ */
+void TrackSensor_Init(TrackSensor_t *sensor)
+{
+    if (sensor == NULL) {
+        return;
+    }
+
+    sensor->raw_mask = 0U;
+    sensor->active_mask = 0U;
+    sensor->stable_mask = 0U;
+    sensor->error = 0.0f;
+    sensor->lost = 1U;
+    sensor->all_active = 0U;
+    sensor->comm_ok = 0U;
+    sensor->threshold_ok = 0U;
+    sensor->last_seen_tick = HAL_GetTick();
+
+    for (uint8_t i = 0U; i < 8U; i++) {
+        sensor->analog[i] = 0U;
+        sensor->threshold[i] = 0U;
+    }
+
+    s_uart_ready = TrackUartInit();
+    sensor->inited = 1U;
+
+    if (!s_uart_ready) {
+        return;
+    }
+
+    BSP_DelayUs(500000U);   /* 等传感器上电稳定 */
+
+    uint8_t mode = TRACK_CMD_MANUAL;
+    (void)HAL_UART_Transmit(&s_uart, &mode, 1U, 5U);
+    BSP_DelayUs(50000U);
+
+    (void)TrackSensor_ReadThresholds(sensor);
+
+    s_last_read_tick = HAL_GetTick();
+    s_last_threshold_tick = s_last_read_tick;
+}
+
+void TrackSensor_Update(TrackSensor_t *sensor)
+{
+    if (sensor == NULL || !sensor->inited) {
+        return;
+    }
+
+    uint32_t now = HAL_GetTick();
+    if ((uint32_t)(now - s_last_read_tick) < TRACK_UART_PERIOD_MS) {
+        return;
+    }
+    s_last_read_tick = now;
+
+    if (!sensor->threshold_ok &&
+        (uint32_t)(now - s_last_threshold_tick) >= 1000U) {
+        s_last_threshold_tick = now;
+        (void)TrackSensor_ReadThresholds(sensor);
+    }
+
+    uint8_t data[16];
+    if (!TrackUartReadFrame(TRACK_CMD_ANALOG, data)) {
+        sensor->comm_ok = 0U;
+        sensor->lost = 1U;
+        sensor->all_active = 0U;
+        sensor->active_mask = 0U;
+        sensor->stable_mask = 0U;
+        return;
+    }
+
+    sensor->comm_ok = 1U;
+
+    for (uint8_t i = 0U; i < 8U; i++) {
+        sensor->analog[i] = (uint16_t)((uint16_t)data[2U * i] |
+                                       ((uint16_t)data[2U * i + 1U] << 8));
+    }
+
+    TrackSensor_ComputeError(sensor);
 }
 
 uint8_t TrackSensor_GetMask(const TrackSensor_t *sensor)
@@ -479,6 +332,22 @@ uint16_t TrackSensor_GetAnalog(const TrackSensor_t *sensor, uint8_t index)
         return 0U;
     }
     return sensor->analog[index];
+}
+
+uint8_t TrackSensor_GetCommOk(const TrackSensor_t *sensor)
+{
+    if (sensor == NULL || !sensor->inited) {
+        return 0U;
+    }
+    return sensor->comm_ok;
+}
+
+uint8_t TrackSensor_GetThresholdOk(const TrackSensor_t *sensor)
+{
+    if (sensor == NULL || !sensor->inited) {
+        return 0U;
+    }
+    return sensor->threshold_ok;
 }
 
 uint32_t TrackSensor_GetLastSeenTick(const TrackSensor_t *sensor)

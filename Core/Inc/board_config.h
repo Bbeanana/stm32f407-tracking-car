@@ -44,13 +44,15 @@
 #define ENC_L_TIM                (&htim3)             /* PC6/PC7  TIM3_CH1/CH2 */
 #define ENC_R_TIM                (&htim4)             /* PD12/PD13 TIM4_CH1/CH2 */
 
-/* ---------------------- 幻尔八路循迹（独立 I2C） ----------------------- */
-/* 单独一路软件 I2C，不和 OLED 共用。传感器地址固定 0x5D。 */
-#define TRACK_I2C_SCL_PORT        GPIOB
-#define TRACK_I2C_SCL_PIN         GPIO_PIN_8
-#define TRACK_I2C_SDA_PORT        GPIOB
-#define TRACK_I2C_SDA_PIN         GPIO_PIN_9
-#define TRACK_I2C_ADDR            0x12U
+/* ---------------------- 幻尔八路循迹（独立 UART） ---------------------- */
+/* USART1：PA9=TX，PA10=RX，115200 8N1，和调试串口 USART2 分开。
+ * 传感器 TX 接 PA10，传感器 RX 接 PA9。 */
+#define TRACK_UART_INSTANCE       USART1
+#define TRACK_UART_BAUD           115200U
+#define TRACK_UART_TX_PORT        GPIOA
+#define TRACK_UART_TX_PIN         GPIO_PIN_9
+#define TRACK_UART_RX_PORT        GPIOA
+#define TRACK_UART_RX_PIN         GPIO_PIN_10
 /* 如果模拟值黑白方向相反（黑线读数反而更大），改成 1 */
 #define TRACK_ANALOG_INVERT       0U
 /* 如果模块装反（通道 1 在车头右侧），改成 1 反转偏差方向 */

@@ -592,6 +592,16 @@ uint16_t Car_GetTrackAnalog(uint8_t index)
     return TrackSensor_GetAnalog(&s_track, index);
 }
 
+uint8_t Car_GetTrackCommOk(void)
+{
+    return TrackSensor_GetCommOk(&s_track);
+}
+
+uint8_t Car_GetTrackThresholdOk(void)
+{
+    return TrackSensor_GetThresholdOk(&s_track);
+}
+
 float Car_GetDistanceCm(void)
 {
     return Ultrasonic_GetDistanceCm(&s_ultra);
