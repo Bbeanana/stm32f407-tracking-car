@@ -30,10 +30,10 @@
 #define CAR_LINE_BASE_SPEED_MPS          0.15f
 #define CAR_LINE_MIN_SPEED_MPS           0.04f
 #define CAR_LINE_MAX_SPEED_MPS           0.34f
-#define CAR_LINE_KP                      0.35f
-#define CAR_LINE_KD                      0.05f
-#define CAR_LINE_TURN_LIMIT_MPS          0.18f
-#define CAR_LINE_ERROR_FILTER            0.35f   /* 0~1，越小越平滑 */
+#define CAR_LINE_KP                      0.22f   /* 降低转向比例，抑制直线摆动 */
+#define CAR_LINE_KD                      0.10f   /* 增加微分阻尼 */
+#define CAR_LINE_TURN_LIMIT_MPS          0.14f   /* 收紧差速转向限幅 */
+#define CAR_LINE_ERROR_FILTER            0.25f   /* 0~1，越小越平滑 */
 #define CAR_LINE_SLOWDOWN_GAIN           0.50f   /* 偏差大时降速比例 */
 
 /* 0=通用左右找线（按最后偏线方向，超时反向）；

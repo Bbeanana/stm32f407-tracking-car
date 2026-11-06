@@ -235,10 +235,10 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_BASE_SPEED_MPS` | 0.15 | 直线基础速度（先低速调试） |
 | `CAR_LINE_MIN_SPEED_MPS` | 0.04 | 大偏差时最低基础速度 |
 | `CAR_LINE_MAX_SPEED_MPS` | 0.34 | 单轮最大速度 |
-| `CAR_LINE_KP` | 0.35 | 偏差比例系数，越大修正越猛 |
-| `CAR_LINE_KD` | 0.05 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.18 | 差速转向限幅 |
-| `CAR_LINE_ERROR_FILTER` | 0.35 | 偏差低通，越小越平滑但越滞后 |
+| `CAR_LINE_KP` | 0.22 | 偏差比例系数，越大修正越猛 |
+| `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.14 | 差速转向限幅 |
+| `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
 | `CAR_RIGHT_TURNS_ONLY` | 0 | 0=通用左右找线；1=只有右转弯特化，找线固定向右且圆弧提示只认右偏 |
 | `CAR_START_REQUIRE_LINE` | 1 | 1=上电后从未见过线时先停车，不原地搜索 |
