@@ -287,14 +287,14 @@ base  = 基础速度 * (1 - 降速比例 * |error|)
 |---|---:|---|
 | `CAR_OBSTACLE_ENABLE` | 1 | 0=关闭超声波避障 |
 | `CAR_OBSTACLE_BEEP_MS` | 200 | 检测到障碍物时蜂鸣时间 |
-| `CAR_OBSTACLE_STOP_CM` | 10 | 小于该距离立即停车 |
+| `CAR_OBSTACLE_STOP_CM` | 13 | 小于该距离立即停车 |
 | `CAR_OBSTACLE_CLEAR_CM` | 15 | 大于该距离才允许恢复，形成回差 |
 | `CAR_OBSTACLE_CLEAR_HOLD_MS` | 300 | 超过清除距离后需持续的时间 |
 | `CAR_OBSTACLE_STOP_LATCH` | 0 | 1=锁存停车，必须复位；0=障碍物移开后自动恢复 |
 
 行为说明：
 
-- 障碍物进入 `CAR_OBSTACLE_STOP_CM`（默认 10cm）以内：立即刹车，状态切到 `STOP`，不后退、不转向。
+- 障碍物进入 `CAR_OBSTACLE_STOP_CM`（默认 13cm）以内：立即刹车，状态切到 `STOP`，不后退、不转向。
 - 障碍物移开但距离仍小于 `CAR_OBSTACLE_CLEAR_CM`（默认 15cm）：继续停车，防止在阈值附近反复启停。
 - 距离大于 `CAR_OBSTACLE_CLEAR_CM` 并保持 `CAR_OBSTACLE_CLEAR_HOLD_MS` 后：如果车仍在线上，自动恢复循迹。
 - 如果需要“遇到障碍物就永久停车”，把 `CAR_OBSTACLE_STOP_LATCH` 改为 `1`，之后必须复位/断电才能继续。
@@ -439,7 +439,7 @@ OB 3         障碍物次数
 ## 5. 状态机
 
 ```text
-INIT ──1.2s──> LINE ──障碍<10cm──> STOP ──障碍移开>15cm 并稳定──> LINE
+INIT ──1.2s──> LINE ──障碍<13cm──> STOP ──障碍移开>15cm 并稳定──> LINE
                  │
                  ├──摄像头无有效帧──> 制动
                  └──编码器故障──> FAULT
