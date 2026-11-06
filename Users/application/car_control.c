@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "board_config.h"
+#include "buzzer.h"
 #include "car_config.h"
 #include "tim.h"
 #include "motion.h"
@@ -25,6 +26,125 @@ static float s_last_error;
 static float s_error_filtered;
 static uint8_t s_line_seen_count;
 
+/* 圆弧弯道提示状态 */
+static uint8_t s_arc_active;
+static uint8_t s_arc_candidate;
+static int8_t s_arc_candidate_sign;
+static uint32_t s_arc_candidate_tick;
+static uint32_t s_arc_exit_tick;
+static uint8_t s_arc_suppressed;
+static uint32_t s_arc_resume_tick;
+static float s_arc_error_slow;
+
+static uint8_t Car_CountMaskBits(uint8_t mask)
+{
+    uint8_t count = 0U;
+
+    while (mask != 0U) {
+        count += (uint8_t)(mask & 1U);
+        mask >>= 1U;
+    }
+
+    return count;
+}
+
+/**
+ * @brief 复位圆弧检测；suppress=1 时在 CAR_ARC_SUPPRESS_MS 内不提示
+ */
+static void Car_ArcReset(uint8_t suppress, uint32_t now)
+{
+    s_arc_active = 0U;
+    s_arc_candidate = 0U;
+    s_arc_candidate_sign = 0;
+    s_arc_candidate_tick = 0U;
+    s_arc_exit_tick = 0U;
+    s_arc_error_slow = TrackSensor_GetError(&s_track);
+
+    if (suppress) {
+        s_arc_suppressed = 1U;
+        s_arc_resume_tick = now + CAR_ARC_SUPPRESS_MS;
+    } else {
+        s_arc_suppressed = 0U;
+        s_arc_resume_tick = 0U;
+    }
+}
+
+/**
+ * @brief 圆弧弯道进出检测
+ *
+ * 只对“偏差持续较大、压线通道数较少、偏差变化不剧烈”的情况提示；
+ * 直角弯道常见的多路压线、丢线、偏差突变都会触发复位/抑制。
+ */
+static void Car_ArcUpdate(uint32_t now, float error, uint8_t lost,
+                          uint8_t all_active)
+{
+#if CAR_ARC_BEEP_ENABLE
+    uint8_t count = Car_CountMaskBits(TrackSensor_GetMask(&s_track));
+    float abs_error = fabsf(error);
+    float error_delta = fabsf(error - s_arc_error_slow);
+    uint8_t sharp = 0U;
+
+    s_arc_error_slow += 0.05f * (error - s_arc_error_slow);
+
+    if (lost || all_active || count > CAR_ARC_MAX_SENSORS ||
+        abs_error > CAR_ARC_MAX_ABS_ERROR ||
+        error_delta > CAR_ARC_SHARP_DELTA) {
+        sharp = 1U;
+    }
+
+    if (sharp) {
+        Car_ArcReset(1U, now);
+        return;
+    }
+
+    if (s_arc_suppressed) {
+        if ((int32_t)(now - s_arc_resume_tick) < 0) {
+            return;
+        }
+        s_arc_suppressed = 0U;
+    }
+
+    if (!s_arc_active) {
+        if (abs_error >= CAR_ARC_ENTER_ABS_ERROR &&
+            abs_error <= CAR_ARC_MAX_ABS_ERROR) {
+            int8_t sign = (error >= 0.0f) ? 1 : -1;
+
+            if (!s_arc_candidate || sign != s_arc_candidate_sign) {
+                s_arc_candidate = 1U;
+                s_arc_candidate_sign = sign;
+                s_arc_candidate_tick = now;
+            } else if ((uint32_t)(now - s_arc_candidate_tick) >=
+                       CAR_ARC_ENTER_DEBOUNCE_MS) {
+                s_arc_candidate = 0U;
+                s_arc_active = 1U;
+                s_arc_exit_tick = 0U;
+                Buzzer_Beep(CAR_ARC_BEEP_MS);
+            }
+        } else {
+            s_arc_candidate = 0U;
+        }
+    } else {
+        if (abs_error <= CAR_ARC_EXIT_ABS_ERROR) {
+            if (s_arc_exit_tick == 0U) {
+                s_arc_exit_tick = now;
+            } else if ((uint32_t)(now - s_arc_exit_tick) >=
+                       CAR_ARC_EXIT_DEBOUNCE_MS) {
+                s_arc_active = 0U;
+                s_arc_exit_tick = 0U;
+                Buzzer_Beep(CAR_ARC_BEEP_MS);
+            }
+        } else {
+            s_arc_exit_tick = 0U;
+        }
+    }
+#else
+    (void)now;
+    (void)error;
+    (void)lost;
+    (void)all_active;
+#endif
+}
+
 static float CarClamp(float value, float min_value, float max_value)
 {
     if (value > max_value) {
@@ -41,6 +161,9 @@ static void Car_EnterState(CarState_t state)
     s_state = state;
     s_state_tick = HAL_GetTick();
     s_line_seen_count = 0U;
+
+    /* 状态切换后先静默一段时间，避免把重新找线/起步当成圆弧 */
+    Car_ArcReset(1U, s_state_tick);
 
     if (state == CAR_STATE_LINE) {
         s_error_filtered = TrackSensor_GetError(&s_track);
@@ -89,6 +212,7 @@ void Car_Init(void)
     s_last_error = 0.0f;
     s_error_filtered = 0.0f;
     s_line_seen_count = 0U;
+    Car_ArcReset(1U, s_state_tick);
 }
 
 /**
@@ -121,7 +245,9 @@ static void Car_LineLoop(void)
         return;
     }
 
-    if (TrackSensor_IsLost(&s_track)) {
+    uint8_t track_lost = TrackSensor_IsLost(&s_track);
+
+    if (track_lost) {
         if ((uint32_t)(now - TrackSensor_GetLastSeenTick(&s_track)) >
             CAR_LOST_STOP_MS) {
             Motion_Brake();
@@ -135,10 +261,13 @@ static void Car_LineLoop(void)
         }
     }
 
+    uint8_t all_active = TrackSensor_IsAllActive(&s_track);
     float error = TrackSensor_GetError(&s_track);
-    if (TrackSensor_IsAllActive(&s_track)) {
+    if (all_active) {
         error = 0.0f;   /* 十字/宽黑线：直行通过 */
     }
+
+    Car_ArcUpdate(now, error, track_lost, all_active);
 
     s_error_filtered +=
         CAR_LINE_ERROR_FILTER * (error - s_error_filtered);

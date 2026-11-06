@@ -7,7 +7,7 @@
 1. **两路直流无刷电机行驶控制**：PWM + INA/INB + STBY，编码器速度闭环；
 2. **车头八路数字循迹**：加权求偏差 + PD 转向；
 3. **HC-SR04 超声波避障**：前方小于阈值时立即刹车停车，不再自动绕行；障碍物移开并稳定后，可按配置恢复循迹；
-4. **蜂鸣器提示**：PB0 低电平触发，上电短鸣一声，提供开/关、翻转和非阻塞定时鸣叫接口。
+4. **蜂鸣器提示**：PB0 低电平触发，上电短鸣一声；圆弧弯道进入/退出各短响一声，直角弯道不提示。
 
 原工程里的 DT7 遥控、MaixCam 视觉、舵机、救援状态机等均已移除。
 
@@ -279,6 +279,39 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 
 > `Buzzer_Beep()` 不阻塞，但必须让 `Buzzer_Update()` 周期运行；主循环 5ms
 > 已经调用。不要用 `HAL_Delay()` 做蜂鸣延时，否则会拖慢电机控制。
+
+### 圆弧弯道蜂鸣提示
+
+只对**圆弧弯道**提示，直角弯道、十字、丢线不提示。进入圆弧和退出圆弧各短响一声（默认 80ms）。
+
+判断逻辑在 `car_control.c`：
+
+- `|E|` 持续大于 `CAR_ARC_ENTER_ABS_ERROR`（默认 0.25）达到
+  `CAR_ARC_ENTER_DEBOUNCE_MS`（默认 180ms）→ 进入圆弧，响一声
+- `|E|` 持续小于 `CAR_ARC_EXIT_ABS_ERROR`（默认 0.18）达到
+  `CAR_ARC_EXIT_DEBOUNCE_MS`（默认 150ms）→ 退出圆弧，响一声
+- 同时压线通道数超过 `CAR_ARC_MAX_SENSORS`、`|E|` 超过
+  `CAR_ARC_MAX_ABS_ERROR`、偏差突变、丢线或全压线 → 按直角/异常处理，
+  复位状态并静默 `CAR_ARC_SUPPRESS_MS`
+- 每次状态切换后会静默 `CAR_ARC_SUPPRESS_MS`，避免起步和找线时误响
+
+| 参数 | 默认 | 说明 |
+|---|---:|---|
+| `CAR_ARC_BEEP_ENABLE` | 1 | 0=关闭圆弧提示 |
+| `CAR_ARC_BEEP_MS` | 80 | 每次提示鸣叫时间 |
+| `CAR_ARC_ENTER_ABS_ERROR` | 0.25 | 进入圆弧的偏差阈值 |
+| `CAR_ARC_EXIT_ABS_ERROR` | 0.18 | 退出圆弧的偏差阈值 |
+| `CAR_ARC_MAX_ABS_ERROR` | 0.78 | 超过该偏差按直角/贴边处理 |
+| `CAR_ARC_MAX_SENSORS` | 3 | 同时压线超过该路数按直角处理 |
+| `CAR_ARC_ENTER_DEBOUNCE_MS` | 180 | 进入圆弧确认时间 |
+| `CAR_ARC_EXIT_DEBOUNCE_MS` | 150 | 退出圆弧确认时间 |
+| `CAR_ARC_SHARP_DELTA` | 0.35 | 偏差突变判定阈值 |
+| `CAR_ARC_SUPPRESS_MS` | 400 | 直角/丢线/状态切换后的静默时间 |
+
+> 8 路数字循迹只能根据偏差和压线组合做近似判断，圆弧和直角不可能 100% 区分。
+> 先看串口遥测的 `E=` 和 `M=`：如果直角弯误响，减小 `CAR_ARC_MAX_SENSORS`
+> 或增大 `CAR_ARC_SHARP_DELTA`；如果圆弧漏响，降低 `CAR_ARC_ENTER_ABS_ERROR`
+> 或减小 `CAR_ARC_ENTER_DEBOUNCE_MS`。
 
 ### 速度环
 

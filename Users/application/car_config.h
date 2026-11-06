@@ -57,6 +57,22 @@
  * 因此无回波按 999cm（前方空旷）处理，避免障碍物移开后一直停车。
  * 串口 U=0 可用于观察本次读数是否有效。 */
 
+/* -------------------- 圆弧弯道蜂鸣提示（不含直角弯） -------------------- */
+/* 判断依据：偏差持续超过阈值 + 压线通道数较少 + 偏差变化不剧烈。
+ * 直角弯道通常表现为多路压线、丢线或偏差突变，会抑制提示。 */
+#define CAR_ARC_BEEP_ENABLE              1
+#define CAR_ARC_BEEP_MS                  80U    /* 进入/退出各短响一声 */
+
+#define CAR_ARC_ENTER_ABS_ERROR          0.25f  /* |E| 超过该值认为进入圆弧候选 */
+#define CAR_ARC_EXIT_ABS_ERROR           0.18f  /* |E| 低于该值认为退出圆弧候选 */
+#define CAR_ARC_MAX_ABS_ERROR            0.78f  /* 更大偏差按直角/贴边处理 */
+#define CAR_ARC_MAX_SENSORS              3U     /* 同时压线超过该路数按直角处理 */
+
+#define CAR_ARC_ENTER_DEBOUNCE_MS        180U   /* 持续这么久才确认进入 */
+#define CAR_ARC_EXIT_DEBOUNCE_MS         150U   /* 持续这么久才确认退出 */
+#define CAR_ARC_SHARP_DELTA              0.35f  /* 偏差慢滤波差值超过该值视为突变 */
+#define CAR_ARC_SUPPRESS_MS              400U   /* 直角/丢线后抑制提示的时间 */
+
 /* --------------------------- 电机与编码器 ----------------------------- */
 /* 1=速度闭环（使用编码器）；0=开环占空比 */
 #define CAR_SPEED_CLOSED_LOOP            1
