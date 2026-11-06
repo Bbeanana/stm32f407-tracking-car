@@ -260,9 +260,11 @@ CAL RAW=18 ACT=18 |...##...| E=+0.00 D=999.0 U=0
 | `CAR_LINE_BASE_SPEED_MPS` | 0.24 | 直线基础速度（再提速 20%） |
 | `CAR_LINE_MIN_SPEED_MPS` | 0.084 | 大偏差时最低基础速度 |
 | `CAR_LINE_MAX_SPEED_MPS` | 0.60 | 单轮最大速度 |
-| `CAR_LINE_KP` | 0.28 | 偏差比例系数，兼顾直角弯转向和直线稳定 |
+| `CAR_LINE_KP` | 0.28 | 小偏差比例系数，兼顾直线稳定 |
 | `CAR_LINE_KD` | 0.10 | 偏差微分，抑制左右摆动 |
-| `CAR_LINE_TURN_LIMIT_MPS` | 0.42 | 差速转向限幅，提高直角弯转向速度 |
+| `CAR_LINE_SHARP_ERROR` | 0.30 | 超过该偏差启用直角弯额外转向 |
+| `CAR_LINE_SHARP_GAIN` | 0.30 | 大偏差额外转向增益 |
+| `CAR_LINE_TURN_LIMIT_MPS` | 0.42 | 差速转向限幅 |
 | `CAR_LINE_ERROR_FILTER` | 0.25 | 偏差低通，越小越平滑但越滞后 |
 | `CAR_LINE_ERROR_DEADBAND` | 0.08 | 中心死区，抑制小幅抖动 |
 | `CAR_LINE_SLOWDOWN_GAIN` | 0.50 | 偏差大时降速比例 |
@@ -352,10 +354,10 @@ Buzzer_Update();        // 主循环周期调用，处理自动关闭
 | `CAR_ARC_BEEP_ENABLE` | 1 | 0=关闭圆弧提示 |
 | `CAR_ARC_BEEP_MS` | 80 | 每次提示鸣叫时间 |
 | `CAR_CAM_ARC_ENTER_DEG` | 8 | 进入圆弧的 CURV 阈值 |
-| `CAR_CAM_ARC_EXIT_DEG` | 2 | 退出圆弧的 CURV 阈值 |
+| `CAR_CAM_ARC_EXIT_DEG` | 4 | 退出圆弧的 CURV 阈值 |
 | `CAR_CAM_ARC_MAX_DEG` | 40 | 超过该值按直角弯处理 |
 | `CAR_CAM_ARC_ENTER_MS` | 100 | 进入圆弧确认时间 |
-| `CAR_CAM_ARC_EXIT_MS` | 300 | 退出圆弧确认时间 |
+| `CAR_CAM_ARC_EXIT_MS` | 150 | 退出圆弧确认时间 |
 | `CAR_CAM_ARC_MIN_MS` | 400 | 入弯后至少这么久才允许出弯 |
 | `CAR_ARC_SUPPRESS_MS` | 400 | 直角/状态切换后的静默时间 |
 
