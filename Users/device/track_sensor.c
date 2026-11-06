@@ -7,7 +7,7 @@
 #include "bsp_delay.h"
 #include "main.h"
 
-#define TRACK_I2C_DELAY_US      2U
+#define TRACK_I2C_DELAY_US      5U
 #define TRACK_READ_PERIOD_MS    10U
 #define TRACK_REG_DIGITAL       0x05U
 #define TRACK_REG_ANALOG        0x06U
